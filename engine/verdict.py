@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from config import settings
 from models import ModerationResult, ModerationScores
 
@@ -19,6 +21,7 @@ def decide(scores: ModerationScores) -> ModerationResult:
     if scores.deepfake_suspect >= settings.threshold_deepfake:
         reasons.append("deepfake_suspect")
 
+    verdict: Literal["allow", "delete", "flag"]
     if reasons:
         verdict = "delete"
     elif any(
