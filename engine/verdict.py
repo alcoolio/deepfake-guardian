@@ -41,4 +41,4 @@ def decide(scores: ModerationScores) -> ModerationResult:
     else:
         verdict = "allow"
 
-    return ModerationResult(verdict=verdict, reasons=reasons, scores=scores)
+    return ModerationResult(verdict=verdict, reasons=reasons, scores=scores, language=None)

@@ -61,6 +61,7 @@ async def moderate_image(request: Request, req: ImageRequest) -> ModerationResul
         sexual_violence=img_scores["sexual_violence"],
         nsfw=img_scores["nsfw"],
         deepfake_suspect=deepfake_score,
+        cyberbullying=0.0,
     )
     result = decide(scores)
     logger.info(
@@ -89,6 +90,7 @@ async def moderate_video(request: Request, req: VideoRequest) -> ModerationResul
         sexual_violence=0.0,
         nsfw=0.0,
         deepfake_suspect=0.0,
+        cyberbullying=0.0,
     )
     result = decide(scores)
     logger.info(
