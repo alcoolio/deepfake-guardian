@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -122,7 +120,6 @@ class TestApiKeyHeader:
         import engine_client
         engine_client._client = None
 
-        import importlib
         import config as config_module
         config_module.settings.engine_api_key = "my-secret"
 

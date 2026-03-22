@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 from classifiers import classify_image, classify_text, decode_image, detect_deepfake_suspect
-from config import settings
 from models import (
     ImageRequest,
     ModerationResult,
@@ -21,12 +18,8 @@ from verdict import decide
 logger = structlog.get_logger()
 router = APIRouter()
 
-# Single shared limiter instance — imported by main.py and wired to the app.
-limiter = Limiter(key_func=get_remote_address)
-
 
 @router.post("/moderate_text", response_model=ModerationResult)
-@limiter.limit(settings.rate_limit)
 async def moderate_text(request: Request, req: TextRequest) -> ModerationResult:
     """Classify plain text and return a moderation verdict."""
     text_scores = classify_text(req.text)
@@ -47,7 +40,6 @@ async def moderate_text(request: Request, req: TextRequest) -> ModerationResult:
 
 
 @router.post("/moderate_image", response_model=ModerationResult)
-@limiter.limit(settings.rate_limit)
 async def moderate_image(request: Request, req: ImageRequest) -> ModerationResult:
     """Classify an image and return a moderation verdict."""
     image = decode_image(req.image_base64, req.image_url)
@@ -73,7 +65,6 @@ async def moderate_image(request: Request, req: ImageRequest) -> ModerationResul
 
 
 @router.post("/moderate_video", response_model=ModerationResult)
-@limiter.limit(settings.rate_limit)
 async def moderate_video(request: Request, req: VideoRequest) -> ModerationResult:
     """Classify a video by sampling frames.
 

@@ -59,7 +59,6 @@ def client_with_key(monkeypatch):
         )
 
         # Reload settings so the new env var is picked up
-        import importlib
 
         import config as config_module
 

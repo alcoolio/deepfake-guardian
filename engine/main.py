@@ -8,11 +8,13 @@ import structlog
 import uvicorn
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
-from slowapi import _rate_limit_exceeded_handler
+from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
 from config import settings
-from routes import limiter, router
+from routes import router
 
 # ---------------------------------------------------------------------------
 # Logging setup (structlog wrapping stdlib)
@@ -34,6 +36,14 @@ logging.basicConfig(format="%(message)s", level=logging.INFO)
 log = structlog.get_logger()
 
 # ---------------------------------------------------------------------------
+# Rate limiter — applied globally via SlowAPIMiddleware
+# ---------------------------------------------------------------------------
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[settings.rate_limit],
+)
+
+# ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
 app = FastAPI(
@@ -42,7 +52,8 @@ app = FastAPI(
     description="Lightweight content moderation API for text, images, and video.",
 )
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+app.add_middleware(SlowAPIMiddleware)
 app.include_router(router)
 
 

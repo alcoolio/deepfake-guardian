@@ -6,7 +6,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 # ---------------------------------------------------------------------------
 # Request bodies
 # ---------------------------------------------------------------------------
@@ -39,4 +38,4 @@ class ModerationScores(BaseModel):
 class ModerationResult(BaseModel):
     verdict: Literal["allow", "delete", "flag"]
     reasons: list[str] = Field(default_factory=list)
-    scores: ModerationScores = Field(default_factory=ModerationScores)
+    scores: ModerationScores = Field(default_factory=ModerationScores)  # type: ignore[arg-type]
