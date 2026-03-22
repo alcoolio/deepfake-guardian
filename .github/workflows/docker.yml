@@ -1,0 +1,32 @@
+name: Docker Build
+
+on:
+  push:
+    branches: ["master", "main"]
+  pull_request:
+    branches: ["master", "main"]
+
+jobs:
+  build-engine:
+    name: Build engine image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t deepfake-guardian/engine:ci ./engine
+
+  build-telegram-bot:
+    name: Build telegram-bot image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t deepfake-guardian/telegram-bot:ci ./telegram-bot
+
+  build-whatsapp-bot:
+    name: Build whatsapp-bot image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t deepfake-guardian/whatsapp-bot:ci ./whatsapp-bot

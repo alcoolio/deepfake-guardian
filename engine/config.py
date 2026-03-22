@@ -16,6 +16,12 @@ class Settings:
     port: int = int(os.getenv("PORT", "8000"))
     log_level: str = os.getenv("LOG_LEVEL", "info")
 
+    # API authentication — leave empty to disable (dev/local only)
+    api_key: str = os.getenv("API_KEY", "")
+
+    # Rate limiting (requests per minute per IP on moderation endpoints)
+    rate_limit: str = os.getenv("RATE_LIMIT", "60/minute")
+
     # Moderation thresholds
     threshold_violence: float = float(os.getenv("THRESHOLD_VIOLENCE", "0.7"))
     threshold_sexual_violence: float = float(os.getenv("THRESHOLD_SEXUAL_VIOLENCE", "0.5"))

@@ -28,6 +28,65 @@ and [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ---
 
+## [0.2.0] — 2026-03-22 — Phase 1: Tests, CI/CD, API Auth, Resilience
+
+### Added
+
+**Engine — API Key Authentication & Rate Limiting:**
+- `X-API-Key` middleware in `engine/main.py` — all moderation endpoints require a
+  valid key when `API_KEY` env var is set; `/health` is always public.
+- Per-IP rate limiting on `/moderate_text`, `/moderate_image`, `/moderate_video`
+  via [slowapi](https://github.com/laurentS/slowapi) (default: `60/minute`,
+  configurable via `RATE_LIMIT` env var).
+- `API_KEY` and `RATE_LIMIT` added to `engine/config.py` and `engine/.env.example`.
+
+**Engine — Test Suite:**
+- `engine/tests/conftest.py` — shared pytest fixtures: `TestClient` with mocked
+  ML classifiers (no GPU/download required), small test image helper.
+- `engine/tests/test_verdict.py` — 12 unit tests covering allow/flag/delete
+  threshold logic across all four score categories.
+- `engine/tests/test_routes.py` — 16 integration tests for all four endpoints
+  including API key authentication and error cases.
+- `engine/tests/test_classifiers.py` — 12 unit tests for `decode_image`,
+  `classify_text`, `classify_image`, and `detect_deepfake_suspect` with mocked
+  pipelines.
+- `engine/pyproject.toml` — pytest, ruff, and mypy configuration.
+
+**Telegram Bot — Resilience & API Key:**
+- `engine_client.py` rewritten with exponential-backoff retry logic: up to 3
+  retries on network errors and 5xx responses (waits: 1s → 2s → 4s).
+- `X-API-Key` header forwarded when `ENGINE_API_KEY` env var is set.
+- `ENGINE_API_KEY` added to `telegram-bot/config.py` and `telegram-bot/.env.example`.
+- `telegram-bot/tests/test_engine_client.py` — tests covering successful calls,
+  retry on transport error, retry on 5xx, max-retry exhaustion, API key header.
+- `telegram-bot/pyproject.toml` — pytest and ruff configuration.
+
+**WhatsApp Bot — Resilience & API Key:**
+- `src/engine-client.ts` rewritten with built-in retry loop (up to 3 retries,
+  exponential backoff, retries on network errors and 5xx status codes).
+- `X-API-Key` header forwarded when `ENGINE_API_KEY` env var is set.
+- `ENGINE_API_KEY` added to `src/config.ts` and `whatsapp-bot/.env.example`.
+
+**CI/CD — GitHub Actions:**
+- `.github/workflows/ci.yml` — runs on every push/PR:
+  - `engine` job: ruff lint, mypy type-check, pytest.
+  - `telegram-bot` job: ruff lint, pytest.
+  - `whatsapp-bot` job: TypeScript build (`tsc`).
+- `.github/workflows/docker.yml` — builds all three Docker images on pushes/PRs
+  to `master`/`main`.
+
+### Changed
+- `engine/requirements.txt` — added `slowapi==0.1.9`, `pytest==8.3.4`,
+  `pytest-asyncio==0.24.0`.
+- `telegram-bot/requirements.txt` — added `pytest==8.3.4`, `pytest-asyncio==0.24.0`.
+- `engine/main.py` — version bumped to `0.2.0`; slowapi wired to app.
+- `engine/routes.py` — all three POST handlers now accept `request: Request` as
+  required by slowapi; shared `limiter` instance exported for `main.py`.
+- `README.md` — updated status banner, added API auth/rate-limit config table,
+  added "Running Tests" section, updated roadmap status.
+
+---
+
 ## [0.0.3] — 2025-01-xx — Neutral Role Terminology in Roadmap
 
 ### Changed
