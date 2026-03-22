@@ -1,0 +1,261 @@
+# CLAUDE.md — Deepfake Guardian
+
+This file gives Claude (and contributors) a complete orientation to the codebase.
+
+---
+
+## Project Purpose
+
+Deepfake Guardian is an open-source, GDPR-first content moderation system for
+group chats. It protects communities — especially those with minors (schools,
+youth organisations, sports clubs) — from harmful content: violence, NSFW
+material, sexual violence, and deepfakes.
+
+**Primary target audience:** chat groups with minors
+**Secondary:** community groups, organisations, companies
+
+**Role terminology (platform-neutral):**
+- **Admin** — group manager (teacher, coach, moderator)
+- **Member** — group participant (student, attendee)
+- **Supervisor** — higher-level oversight (principal, board member)
+
+---
+
+## Repository Layout
+
+```
+deepfake-guardian/
+├── engine/             # Python 3.11 · FastAPI — content classification API
+├── telegram-bot/       # Python · python-telegram-bot — Telegram group listener
+├── whatsapp-bot/       # Node.js · TypeScript · Baileys — WhatsApp group listener
+├── docker-compose.yml  # Orchestrates all three services
+├── ROADMAP.md          # Phase-by-phase development plan
+├── CHANGELOG.md        # Release history
+└── CLAUDE.md           # This file
+```
+
+---
+
+## Services
+
+### `engine/` — Moderation Engine (FastAPI)
+
+The central brain. All bots call this API to get moderation decisions.
+
+| File | Purpose |
+|------|---------|
+| `main.py` | FastAPI app factory, mounts router, configures structlog |
+| `routes.py` | Three POST endpoints: `/moderate_text`, `/moderate_image`, `/moderate_video` |
+| `classifiers.py` | ML classifiers: text (BART zero-shot), image (CLIP zero-shot), deepfake stub |
+| `verdict.py` | `decide(scores)` → `"allow"` / `"flag"` / `"delete"` based on thresholds |
+| `models.py` | Pydantic request/response schemas (`ModerationResult`, `ModerationScores`) |
+| `config.py` | `Settings` class — all config from env vars with sane defaults |
+| `requirements.txt` | Python dependencies |
+| `Dockerfile` | Container image |
+
+**API endpoints:**
+```
+POST /moderate_text   {"text": "..."}
+POST /moderate_image  {"image_base64": "..." | "image_url": "..."}
+POST /moderate_video  {"video_base64": "..." | "video_url": "..."}
+GET  /health          (health check)
+```
+
+**Response shape** (`ModerationResult`):
+```json
+{
+  "verdict": "allow" | "flag" | "delete",
+  "reasons": ["violence", "nsfw", ...],
+  "scores": {
+    "violence": 0.0,
+    "sexual_violence": 0.0,
+    "nsfw": 0.0,
+    "deepfake_suspect": 0.0
+  }
+}
+```
+
+**Verdict logic** (`verdict.py`):
+- Score ≥ threshold → `"delete"` (reason added to list)
+- Any score ≥ 0.4 but below threshold → `"flag"`
+- Otherwise → `"allow"`
+
+**Default thresholds** (all overridable via env):
+```
+THRESHOLD_VIOLENCE        = 0.7
+THRESHOLD_SEXUAL_VIOLENCE = 0.5
+THRESHOLD_NSFW            = 0.6
+THRESHOLD_DEEPFAKE        = 0.8
+```
+
+### `telegram-bot/`
+
+| File | Purpose |
+|------|---------|
+| `main.py` | Registers handlers for text/photo/video in group chats; acts on verdicts |
+| `engine_client.py` | Async HTTP client that calls the engine API |
+| `config.py` | Settings loaded from env (`TELEGRAM_BOT_TOKEN`, `ENGINE_URL`) |
+
+Bot behaviour:
+- Ignores private chats and commands (only group messages)
+- `"delete"` verdict: deletes message if bot is admin, otherwise @-mentions admins
+- `"flag"` verdict: always @-mentions admins
+
+### `whatsapp-bot/`
+
+TypeScript/Node.js bot using the Baileys library. Mirrors telegram-bot behaviour.
+Lives in `src/`. See its own `README.md` for setup details.
+
+---
+
+## Current Limitations (Prototype State)
+
+> These are known stubs — do **not** treat them as bugs to silently fix without
+> tracking in the roadmap.
+
+| Area | Status |
+|------|--------|
+| Deepfake detection | **Stub** — always returns `0.05`. See `engine/classifiers.py:detect_deepfake_suspect()` |
+| Video moderation | **Stub** — always returns `"allow"`. Frame extraction not implemented. See `engine/routes.py:moderate_video()` |
+| Image violence score | Always returns `0.0` — model not wired |
+| Tests | None yet |
+| CI/CD | None yet |
+| API authentication | None — engine is open |
+| GDPR / data persistence | None — stateless |
+| i18n | English-only UI strings, hardcoded |
+| Cyberbullying detection | Not implemented |
+
+---
+
+## Development Roadmap
+
+The full plan is in `ROADMAP.md`. Summary:
+
+| Phase | Focus | Depends on |
+|-------|-------|------------|
+| 1 | Tests, CI/CD, API auth, resilience | — |
+| 2 | i18n architecture, German + English language packs, cyberbullying | Phase 1 |
+| 3 | GDPR, database, warning/escalation system | Phase 1 |
+| 4 | Real deepfake detection, video frame extraction | Phase 1 |
+| 5 | Admin dashboard, bot commands, educational feedback | Phase 2 + 3 |
+| 6 | WhatsApp parity, Signal, Discord, community language packs | Phase 5 |
+
+Phases 2, 3, and 4 can be developed **partially in parallel** (independent code paths).
+
+---
+
+## Running the Project
+
+### With Docker (recommended)
+
+```bash
+cp engine/.env.example engine/.env
+cp telegram-bot/.env.example telegram-bot/.env
+cp whatsapp-bot/.env.example whatsapp-bot/.env
+# Edit the .env files — at minimum set TELEGRAM_BOT_TOKEN
+docker compose up --build
+```
+
+First run downloads ML models (~1.5 GB). Subsequent runs use the Docker volume cache.
+
+### Without Docker
+
+```bash
+# Terminal 1 — Engine
+cd engine && pip install -r requirements.txt && python main.py
+
+# Terminal 2 — Telegram bot
+cd telegram-bot && pip install -r requirements.txt && python main.py
+
+# Terminal 3 — WhatsApp bot
+cd whatsapp-bot && npm install && npm run build && npm start
+```
+
+### Manual engine test
+
+```bash
+curl -X POST http://localhost:8000/moderate_text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "hello world"}'
+```
+
+---
+
+## Environment Variables
+
+### Engine (`engine/.env`)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HOST` | `0.0.0.0` | Bind address |
+| `PORT` | `8000` | Listen port |
+| `LOG_LEVEL` | `info` | Logging verbosity |
+| `THRESHOLD_VIOLENCE` | `0.7` | Delete threshold for violence (0–1) |
+| `THRESHOLD_SEXUAL_VIOLENCE` | `0.5` | Delete threshold for sexual violence |
+| `THRESHOLD_NSFW` | `0.6` | Delete threshold for NSFW |
+| `THRESHOLD_DEEPFAKE` | `0.8` | Delete threshold for deepfake |
+
+### Telegram bot (`telegram-bot/.env`)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TELEGRAM_BOT_TOKEN` | — | **Required.** Token from @BotFather |
+| `ENGINE_URL` | `http://engine:8000` | Engine base URL |
+
+### WhatsApp bot (`whatsapp-bot/.env`)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENGINE_URL` | `http://engine:8000` | Engine base URL |
+
+---
+
+## Code Conventions
+
+- **Python:** `from __future__ import annotations` at the top of every file; Pydantic v2 models; structlog for structured logging; async handlers where IO is involved.
+- **TypeScript:** strict mode, ESM modules.
+- **Secrets:** never commit `.env` files — only `.env.example` templates.
+- **No message content stored** — the engine only processes and returns scores; nothing is persisted (until Phase 3 adds GDPR-compliant audit logs, which store *metadata* only, never message text).
+
+---
+
+## Key Architectural Decisions
+
+1. **Engine is the single source of truth** for moderation logic. Bots are thin clients — they only forward content and act on verdicts.
+2. **Threshold-based verdicts** are intentionally simple now. Phase 2 introduces profile-based thresholds (`minors_strict`, `default`, `permissive`).
+3. **i18n-first architecture** (Phase 2): language detection → language pack → language-specific ML model + patterns + support resources. Adding a new language = one new Python file.
+4. **GDPR-first** (Phase 3): user IDs are hashed before storage; message content is never persisted; auto-deletion after 30 days; full Article 17 (right to erasure) support.
+5. **Telegram has higher priority** than WhatsApp — it uses the official Bot API and is simpler to develop against.
+
+---
+
+## Contributing a Language Pack (planned — Phase 2+)
+
+Once the i18n architecture is in place, adding a language pack requires only:
+
+```python
+# engine/i18n/packs/fr.py
+from engine.i18n.base import LanguagePack
+
+class FrenchPack(LanguagePack):
+    lang_code = "fr"
+    lang_name = "Français"
+
+    def detect(self, text: str) -> float: ...
+    def get_classifier(self): ...
+    def get_patterns(self) -> list: ...
+    def get_labels(self) -> dict: ...
+    def get_educational_messages(self) -> dict: ...
+    def get_helplines(self) -> list: ...
+```
+
+The registry auto-discovers all `LanguagePack` subclasses. Enable via `ENABLED_LANGUAGES=de,en,fr`.
+
+---
+
+## Security Notes
+
+- The engine currently has **no authentication**. Phase 1 adds an `API_KEY` middleware.
+- Do not expose the engine port (8000) publicly without auth.
+- The WhatsApp bot uses an unofficial API (Baileys) — account bans are possible with aggressive usage.
+- Content sent to the engine is processed in-memory and not logged (only metadata: verdict, reasons, text preview capped at 80 chars).
