@@ -1,0 +1,11 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+httpx==0.28.1
+transformers==4.47.1
+torch==2.5.1
+torchvision==0.20.1
+Pillow==11.1.0
+numpy==2.2.1
+structlog==24.4.0
+python-dotenv==1.0.1
