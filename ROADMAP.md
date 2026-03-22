@@ -2,11 +2,16 @@
 
 ## Kontext
 
-Das Monorepo enthält drei Services (engine, telegram-bot, whatsapp-bot) als funktionsfähigen Prototyp. Primäre Zielgruppe: **Schüler:innen-Chatgruppen** in DACH. Lehrkräfte/Schulpersonal als Admins. Der aktuelle Stand hat kritische Lücken: keine Tests, kein DSGVO-Konzept, Deepfake-Erkennung ist ein Stub, keine deutsche Sprachunterstützung, kein Cybermobbing-Erkennung, kein Dashboard.
+Das Monorepo enthält drei Services (engine, telegram-bot, whatsapp-bot) als funktionsfähigen Prototyp. Primäre Zielgruppe: **Chatgruppen mit Minderjährigen** (z.B. Schulen, Jugendorganisationen, Sportvereine). Weitere Zielgruppen: Community-Gruppen, Organisationen, Unternehmen. Der aktuelle Stand hat kritische Lücken: keine Tests, kein DSGVO-Konzept, Deepfake-Erkennung ist ein Stub, keine deutsche Sprachunterstützung, keine Cybermobbing-Erkennung, kein Dashboard.
+
+**Rollen-Terminologie (neutral, nicht schulspezifisch):**
+- **Admin** = Gruppenverantwortliche (Lehrkräfte, Trainer, Moderatoren, etc.)
+- **Member** = Gruppenmitglieder (Schüler:innen, Teilnehmer:innen, etc.)
+- **Supervisor** = Übergeordnete Aufsicht (Schulleitung, Vereinsvorstand, etc.)
 
 **Entscheidungen des Users:**
 - Telegram hat höhere Priorität (offizielle API, einfacher)
-- Einfaches Web-Dashboard für Lehrkräfte
+- Einfaches Web-Dashboard für Admins
 - Volle DSGVO-Compliance (Minderjährige = höchste Schutzstufe)
 
 ---
@@ -66,8 +71,8 @@ Das Monorepo enthält drei Services (engine, telegram-bot, whatsapp-bot) als fun
       - `get_classifier() -> TextClassifier` — Sprachspezifisches ML-Modell
       - `get_patterns() -> list[HarmPattern]` — Regex/Keyword-basierte Patterns
       - `get_labels() -> dict[str, str]` — Lokalisierte Kategorie-Namen
-      - `get_educational_messages() -> dict[str, str]` — Pädagogische Texte
-      - `get_helplines() -> list[Helpline]` — Lokale Hilfsangebote
+      - `get_educational_messages() -> dict[str, str]` — Educational Feedback Texte
+      - `get_helplines() -> list[Helpline]` — Lokale Hilfs- und Beratungsangebote
     - `engine/i18n/registry.py` — Plugin-Registry: Lädt alle `LanguagePack`-Subklassen automatisch
     - `engine/i18n/detector.py` — Sprach-Router: Erkennt Sprache → wählt passendes Pack
   - `engine/i18n/packs/` — Sprachpaket-Verzeichnis:
@@ -96,8 +101,8 @@ Das Monorepo enthält drei Services (engine, telegram-bot, whatsapp-bot) als fun
     - Ausgrenzungs-Sprache ("du gehörst nicht dazu", "keiner mag dich")
     - Erpressungs-Muster ("ich zeig das allen", "wenn du nicht...")
     - Doxxing-Indikatoren (deutsche Adressformate, Telefonnummern)
-  - **Pädagogische Nachrichten:** Altersgerechte Erklärungen auf Deutsch
-  - **Hilfsangebote:** Nummer gegen Kummer, Jugendnotmail, etc.
+  - **Educational Messages:** Erklärungen auf Deutsch (altersgerecht konfigurierbar)
+  - **Support Resources:** Nummer gegen Kummer, Jugendnotmail, Telefonseelsorge, etc.
 
 ### 2.3 Englisches Sprachpaket (Migration)
 - **Datei:** `engine/i18n/packs/en.py`
@@ -117,15 +122,16 @@ Das Monorepo enthält drei Services (engine, telegram-bot, whatsapp-bot) als fun
   - `engine/verdict.py` — Cyberbullying-Schwellwert einbauen
   - `engine/config.py` — `THRESHOLD_CYBERBULLYING=0.5`
 
-### 2.5 Altersgerechte Schwellwert-Profile
+### 2.5 Schwellwert-Profile
 - **Neue Dateien:**
   - `engine/profiles.py` — Vordefinierte Threshold-Sets:
-    - `school_strict` (niedrigere Schwellwerte, strengere Moderation)
-    - `school_standard` (Standard für Schulgruppen)
-    - `adult_default` (aktuelle Werte, für allgemeine Gruppen)
+    - `minors_strict` (niedrigere Schwellwerte, strengere Moderation — für Gruppen mit Minderjährigen)
+    - `minors_standard` (Standard für Gruppen mit Minderjährigen)
+    - `default` (aktuelle Werte, für allgemeine Gruppen)
+    - `permissive` (höhere Schwellwerte, weniger Eingriffe — für erwachsene Communities)
     - Profile sind JSON-serialisierbar → können später per Dashboard konfiguriert werden
 - **Modifizierte Dateien:**
-  - `engine/config.py` — `MODERATION_PROFILE=school_strict`
+  - `engine/config.py` — `MODERATION_PROFILE=default`
   - `engine/verdict.py` — Profil-basierte Schwellwerte nutzen
 
 ### 2.6 Bot-Nachrichten i18n
@@ -140,7 +146,7 @@ Das Monorepo enthält drei Services (engine, telegram-bot, whatsapp-bot) als fun
 
 **Aufwand:** L-XL | **Ergebnis:** Sprachunabhängige Architektur mit Deutsch + Englisch. Neue Sprachen = neue Datei in `packs/`. Bot-UI lokalisiert.
 
-> **Warum das ein Wettbewerbsvorteil ist:** Die meisten Content-Moderation-Tools sind English-only. Eine i18n-first Architektur + DSGVO-Compliance macht Deepfake Guardian attraktiv für Schulen weltweit — nicht nur DACH.
+> **Warum das ein Wettbewerbsvorteil ist:** Die meisten Content-Moderation-Tools sind English-only. Eine i18n-first Architektur + DSGVO-Compliance macht Deepfake Guardian attraktiv für Organisationen weltweit — nicht nur DACH.
 
 ---
 
@@ -187,13 +193,13 @@ Das Monorepo enthält drei Services (engine, telegram-bot, whatsapp-bot) als fun
   - `engine/warnings.py` — Warn-Service:
     - 1. Verstoß: Pädagogischer Hinweis (DM an User)
     - 2. Verstoß: Warnung + Admin-Benachrichtigung
-    - 3. Verstoß: Automatische Meldung an verantwortliche Lehrkraft
-    - Zähler pro User+Gruppe, konfigurierbare Eskalationsstufen
+    - 3. Verstoß: Automatische Meldung an Supervisor (konfigurierbar)
+    - Zähler pro Member+Gruppe, konfigurierbare Eskalationsstufen
 - **Modifizierte Dateien:**
   - `engine/routes.py` — `/warnings/{user_hash}` Endpoints
   - `telegram-bot/main.py` — Warn-Logik in `_handle_verdict()` integrieren
 
-**Aufwand:** XL | **Ergebnis:** DSGVO-konforme Moderation mit Audit-Trail und pädagogischem Eskalationssystem
+**Aufwand:** XL | **Ergebnis:** DSGVO-konforme Moderation mit Audit-Trail und konfigurierbarem Eskalationssystem
 
 ---
 
@@ -231,9 +237,9 @@ Das Monorepo enthält drei Services (engine, telegram-bot, whatsapp-bot) als fun
 
 ---
 
-## Phase 5: Admin-Dashboard & Lehrkräfte-Tools
+## Phase 5: Admin-Dashboard & Moderations-Tools
 
-**Ziel:** Einfaches Web-Dashboard für Lehrkräfte: Überblick über Moderation, Statistiken, Konfiguration.
+**Ziel:** Einfaches Web-Dashboard für Admins: Überblick über Moderation, Statistiken, Konfiguration.
 
 ### 5.1 Dashboard-Backend (Engine erweitern)
 - **Neue Dateien:**
@@ -256,7 +262,7 @@ Das Monorepo enthält drei Services (engine, telegram-bot, whatsapp-bot) als fun
 - **Modifizierte Dateien:**
   - `docker-compose.yml` — Dashboard-Service hinzufügen (Port 3000)
 
-### 5.3 Bot-Befehle für Lehrkräfte
+### 5.3 Bot-Befehle für Admins
 - **Modifizierte Dateien:**
   - `telegram-bot/main.py` — Admin-Befehle:
     - `/stats` — Kurzstatistik der letzten 7 Tage
@@ -269,9 +275,9 @@ Das Monorepo enthält drei Services (engine, telegram-bot, whatsapp-bot) als fun
 - Nutzt die `get_educational_messages()` und `get_helplines()` aus den LanguagePacks (Phase 2)
 - Keine neue Datei nötig — die i18n-Architektur liefert die Inhalte bereits sprachspezifisch
 - **Modifizierte Dateien:**
-  - `telegram-bot/main.py` — Bei Warn/Delete: pädagogische DM an User senden (Sprache = Gruppen-Sprache)
+  - `telegram-bot/main.py` — Bei Warn/Delete: Educational Feedback DM an Member senden (Sprache = Gruppen-Sprache)
 
-**Aufwand:** XL | **Ergebnis:** Lehrkräfte haben ein Dashboard + Bot-Befehle + Schüler:innen erhalten pädagogisches Feedback in ihrer Sprache
+**Aufwand:** XL | **Ergebnis:** Admins haben ein Dashboard + Bot-Befehle + Members erhalten Educational Feedback in ihrer Sprache
 
 ---
 
@@ -286,7 +292,7 @@ Das Monorepo enthält drei Services (engine, telegram-bot, whatsapp-bot) als fun
 ### 6.2 Weitere Plattformen
 - **Neue Verzeichnisse:**
   - `signal-bot/` — Signal-Messenger Bot (signal-cli oder libsignal)
-  - `discord-bot/` — Discord Bot (discord.js) — relevant für Gaming-Communities an Schulen
+  - `discord-bot/` — Discord Bot (discord.js) — relevant für Gaming-Communities und Jugendgruppen
 
 ### 6.3 Kubernetes & Skalierung
 - **Neue Dateien:**
@@ -294,7 +300,7 @@ Das Monorepo enthält drei Services (engine, telegram-bot, whatsapp-bot) als fun
   - `engine/Dockerfile.gpu` — GPU-optimiertes Image für größere Installationen
 
 ### 6.4 Plugin-System & Community-Sprachpakete
-- Engine-Plugins für benutzerdefinierte Classifier (Schulen können eigene Regeln hinzufügen)
+- Engine-Plugins für benutzerdefinierte Classifier (Organisationen können eigene Regeln hinzufügen)
 - `pip install deepfake-guardian-lang-fr` → Französisches Sprachpaket als separates Paket
 - Community-Beiträge: Sprachpakete als eigene Repos mit standardisiertem Interface (LanguagePack)
 - Dokumentation: "How to create a Language Pack" Guide
@@ -306,7 +312,7 @@ Das Monorepo enthält drei Services (engine, telegram-bot, whatsapp-bot) als fun
   - `tr` — Türkisch (große Diaspora in DACH)
   - `ar` — Arabisch (wachsende Nachfrage)
   - `it` — Italienisch (Schweiz, Italien)
-- Jedes Paket bringt mit: ML-Modell, kulturspezifische Patterns, Hilfsangebote, pädagogische Texte
+- Jedes Paket bringt mit: ML-Modell, kulturspezifische Patterns, Support Resources, Educational Messages
 
 **Aufwand:** XL | **Ergebnis:** Multi-Plattform, multilingual, skalierbar, erweiterbar
 
@@ -320,7 +326,7 @@ Das Monorepo enthält drei Services (engine, telegram-bot, whatsapp-bot) als fun
 | 2 | i18n-Architektur, Cybermobbing, DE+EN Sprachpakete | L-XL | Phase 1 |
 | 3 | DSGVO, Datenbank, Warnsystem, Einwilligung | XL | Phase 1 |
 | 4 | Echte Deepfake-Erkennung, Video-Analyse | L | Phase 1 |
-| 5 | Dashboard, Lehrkräfte-Tools, Feedback | XL | Phase 2+3 |
+| 5 | Dashboard, Admin-Tools, Feedback | XL | Phase 2+3 |
 | 6 | WhatsApp-Parität, Signal, Discord, Community-Sprachen | XL | Phase 5 |
 
 Phase 2, 3 und 4 können **teilweise parallel** entwickelt werden (unabhängige Codepfade). Phase 5 benötigt die Datenbank aus Phase 3 und die i18n-Architektur aus Phase 2.
@@ -330,10 +336,10 @@ Phase 2, 3 und 4 können **teilweise parallel** entwickelt werden (unabhängige 
 ## Verifizierung pro Phase
 
 - **Phase 1:** `pytest` läuft grün, CI-Pipeline grün, Engine lehnt Requests ohne API-Key ab
-- **Phase 2:** `engine/i18n/packs/de.py` erkennt "Du bist so hässlich" als Cybermobbing. Neues Sprachpaket = 1 neue Datei. Bot antwortet auf Deutsch. `school_strict` Profil aktiv.
+- **Phase 2:** `engine/i18n/packs/de.py` erkennt "Du bist so hässlich" als Cybermobbing. Neues Sprachpaket = 1 neue Datei. Bot antwortet auf Deutsch. `minors_strict` Profil aktiv.
 - **Phase 3:** Moderations-Events in DB sichtbar, `/delete_my_data` Befehl funktioniert, Auto-Löschung nach 30 Tagen
 - **Phase 4:** Bekanntes Deepfake-Bild wird mit Score >0.7 erkannt, Video-Frames werden extrahiert
-- **Phase 5:** Dashboard zeigt Statistiken, Lehrkraft kann `/stats` im Chat nutzen, pädagogisches Feedback sprachspezifisch
+- **Phase 5:** Dashboard zeigt Statistiken, Admin kann `/stats` im Chat nutzen, Educational Feedback sprachspezifisch
 - **Phase 6:** Signal-Bot antwortet, K8s Deployment läuft, `pip install deepfake-guardian-lang-fr` möglich
 
 ---
@@ -376,8 +382,8 @@ class LanguagePack(ABC):
     def get_classifier() -> Callable  # Sprachspezifisches ML-Modell
     def get_patterns() -> list        # Regex/Keyword-Patterns
     def get_labels() -> dict          # Lokalisierte Kategorie-Namen
-    def get_educational_messages()    # Pädagogische Erklärungen
-    def get_helplines() -> list       # Lokale Hilfsangebote
+    def get_educational_messages()    # Educational feedback messages
+    def get_helplines() -> list       # Local support resources
 ```
 
 **Neues Sprachpaket hinzufügen = 1 Datei:**
@@ -413,6 +419,6 @@ class FrenchPack(LanguagePack):
 | Kultureller Kontext | Pro Sprache: Patterns, Hilfsangebote, Gesetze | Einheitsmodell |
 | Datenschutz | DSGVO-first (höchstes Niveau weltweit) | Oft US-centric, minimal |
 | Neue Sprache | 1 Python-Datei + 1 JSON | Wochen/Monate Entwicklung |
-| Zielgruppe | Minderjährige (strengster Schutz) | Generisch |
+| Zielgruppe | Von Minderjährigen bis Unternehmen (strengster Schutz als Default) | Generisch |
 
-> **Das hohe Maß an Datenschutz wird in anderen Ländern ein großer Pluspunkt sein** — DSGVO-Compliance für Minderjährige ist der strengste Standard weltweit. Wer diesen erfüllt, erfüllt automatisch auch COPPA (USA), PIPEDA (Kanada), LGPD (Brasilien), etc.
+> **Das hohe Maß an Datenschutz wird in anderen Ländern ein großer Pluspunkt sein** — DSGVO-Compliance für Minderjährige ist der strengste Standard weltweit. Wer diesen erfüllt, erfüllt automatisch auch COPPA (USA), PIPEDA (Kanada), LGPD (Brasilien), etc. Auch Unternehmen und Organisationen profitieren von diesem Datenschutzniveau.
