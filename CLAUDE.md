@@ -253,6 +253,22 @@ The registry auto-discovers all `LanguagePack` subclasses. Enable via `ENABLED_L
 
 ---
 
+## Versioning & Changelog Guidelines
+
+This project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
+
+| Change type | Version bump | Examples |
+|-------------|-------------|---------|
+| Breaking API or behaviour change | `MAJOR` (1.0.0 → 2.0.0) | Removing an endpoint, changing response schema |
+| New feature or capability | `MINOR` (0.1.0 → 0.2.0) | New moderation category, new bot command, new phase shipped |
+| Docs, wording, refactors, renames, minor fixes | `PATCH` (0.0.1 → 0.0.2) | Translating docs, renaming terminology, fixing a typo, adjusting a threshold default |
+
+**Rule of thumb:** if nothing in the running system behaves differently, it is a
+`PATCH`. Neutral role terminology changes, README rewrites, roadmap updates, and
+translation-only commits are all `PATCH` bumps — not `MINOR`.
+
+---
+
 ## Security Notes
 
 - The engine currently has **no authentication**. Phase 1 adds an `API_KEY` middleware.

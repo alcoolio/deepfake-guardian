@@ -2,9 +2,12 @@
 
 All notable changes to Deepfake Guardian are documented here.
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-This project does not yet use semantic versioning — entries are grouped by git
-milestone until the first stable release.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+and [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
+
+- `PATCH` bump (0.0.x) — docs, wording, renames, translations, minor fixes; nothing in the running system changes.
+- `MINOR` bump (0.x.0) — new feature or capability added.
+- `MAJOR` bump (x.0.0) — breaking change to API or behaviour.
 
 ---
 
@@ -25,12 +28,13 @@ milestone until the first stable release.
 
 ---
 
-## [0.3.0] — 2025-01-xx — Neutral Role Terminology in Roadmap
+## [0.0.3] — 2025-01-xx — Neutral Role Terminology in Roadmap
 
 ### Changed
 - `ROADMAP.md` — replaced school-specific terminology with platform-neutral roles:
   Admin (group manager), Member (participant), Supervisor (higher-level oversight).
   Broadens the target audience beyond schools to any organisation running group chats.
+  No behaviour change → patch bump.
 
 ---
 
