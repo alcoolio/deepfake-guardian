@@ -20,6 +20,8 @@ milestone until the first stable release.
 - `README.md` — rewritten in English as the primary repository language; added
   moderation category status table, known limitations section, target audience
   section, contributing guidance, and security & privacy notes.
+- `ROADMAP.md` — translated from German to English; all section headings, descriptions,
+  design principles, verification criteria, and commentary are now in English.
 
 ---
 
