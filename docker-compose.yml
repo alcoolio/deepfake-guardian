@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  engine:
+    build: ./engine
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./engine/.env
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+    networks:
+      - moderation
+    restart: unless-stopped
+
+  telegram-bot:
+    build: ./telegram-bot
+    env_file:
+      - ./telegram-bot/.env
+    depends_on:
+      - engine
+    networks:
+      - moderation
+    restart: unless-stopped
+
+  whatsapp-bot:
+    build: ./whatsapp-bot
+    env_file:
+      - ./whatsapp-bot/.env
+    depends_on:
+      - engine
+    volumes:
+      - wa-session:/app/auth_info
+    networks:
+      - moderation
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+networks:
+  moderation:
+    driver: bridge
+
+volumes:
+  hf-cache:
+  wa-session:
