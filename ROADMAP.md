@@ -21,7 +21,7 @@ detection, no dashboard.
 
 ---
 
-## Phase 1: Foundation & Production Readiness
+## Phase 1: Foundation & Production Readiness ✅
 
 **Goal:** Make the existing code testable, secure, and deployable.
 
@@ -63,7 +63,7 @@ detection, no dashboard.
 
 ---
 
-## Phase 2: i18n Architecture, Cyberbullying Detection & Language Packs
+## Phase 2: i18n Architecture, Cyberbullying Detection & Language Packs ✅
 
 **Goal:** Build a language-agnostic moderation architecture. Implement German as
 the first language pack. Every additional language + culture-specific rules should

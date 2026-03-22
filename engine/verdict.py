@@ -7,6 +7,12 @@ from typing import Literal
 from config import settings
 from models import ModerationResult, ModerationScores
 
+# Fields checked for the "flag" (elevated but below delete threshold) condition
+_FLAG_FIELDS = ("violence", "sexual_violence", "nsfw", "deepfake_suspect", "cyberbullying")
+
+# Score at or above which a field is considered "elevated" (→ flag)
+_FLAG_THRESHOLD = 0.4
+
 
 def decide(scores: ModerationScores) -> ModerationResult:
     """Apply threshold rules and return the final moderation result."""
@@ -20,18 +26,18 @@ def decide(scores: ModerationScores) -> ModerationResult:
         reasons.append("nsfw")
     if scores.deepfake_suspect >= settings.threshold_deepfake:
         reasons.append("deepfake_suspect")
+    if scores.cyberbullying >= settings.threshold_cyberbullying:
+        reasons.append("cyberbullying")
 
     verdict: Literal["allow", "delete", "flag"]
     if reasons:
         verdict = "delete"
-    elif any(
-        getattr(scores, field) >= 0.4
-        for field in ("violence", "sexual_violence", "nsfw", "deepfake_suspect")
-    ):
+    elif any(getattr(scores, field) >= _FLAG_THRESHOLD for field in _FLAG_FIELDS):
         # Scores are elevated but below delete thresholds → flag for review
         verdict = "flag"
-        reasons = [f"elevated_{f}" for f in ("violence", "sexual_violence", "nsfw", "deepfake_suspect")
-                    if getattr(scores, f) >= 0.4]
+        reasons = [
+            f"elevated_{f}" for f in _FLAG_FIELDS if getattr(scores, f) >= _FLAG_THRESHOLD
+        ]
     else:
         verdict = "allow"
 

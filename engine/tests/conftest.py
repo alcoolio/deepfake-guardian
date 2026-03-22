@@ -14,21 +14,23 @@ from PIL import Image
 # Ensure no API_KEY is set during tests by default so auth is disabled
 os.environ.setdefault("API_KEY", "")
 
+# Safe scores returned by the mocked classify_text
+_SAFE_TEXT_SCORES = {
+    "violence": 0.01,
+    "sexual_violence": 0.01,
+    "nsfw": 0.01,
+    "cyberbullying": 0.01,
+    "lang_code": "en",
+}
+
 
 @pytest.fixture()
 def client():
     """Return a TestClient with ML classifiers mocked out (fast, no GPU needed)."""
     with (
-        patch("classifiers._get_text_classifier") as mock_text_clf,
+        patch("classifiers.classify_text", return_value=_SAFE_TEXT_SCORES),
         patch("classifiers._get_image_classifier") as mock_img_clf,
     ):
-        # Text classifier returns safe scores
-        mock_text_clf.return_value = MagicMock(
-            return_value={
-                "labels": ["violence", "sexual content", "hate speech", "harassment", "safe"],
-                "scores": [0.01, 0.01, 0.01, 0.01, 0.96],
-            }
-        )
         # Image classifier returns safe NSFW score
         mock_img_clf.return_value = MagicMock(
             return_value=[{"label": "normal", "score": 0.98}, {"label": "nsfw", "score": 0.02}]
@@ -45,21 +47,14 @@ def client_with_key(monkeypatch):
     monkeypatch.setenv("API_KEY", "test-secret-key")
 
     with (
-        patch("classifiers._get_text_classifier") as mock_text_clf,
+        patch("classifiers.classify_text", return_value=_SAFE_TEXT_SCORES),
         patch("classifiers._get_image_classifier") as mock_img_clf,
     ):
-        mock_text_clf.return_value = MagicMock(
-            return_value={
-                "labels": ["violence", "sexual content", "hate speech", "harassment", "safe"],
-                "scores": [0.01, 0.01, 0.01, 0.01, 0.96],
-            }
-        )
         mock_img_clf.return_value = MagicMock(
             return_value=[{"label": "normal", "score": 0.98}, {"label": "nsfw", "score": 0.02}]
         )
 
         # Reload settings so the new env var is picked up
-
         import config as config_module
 
         config_module.settings.api_key = "test-secret-key"

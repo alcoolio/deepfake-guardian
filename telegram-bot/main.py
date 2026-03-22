@@ -20,6 +20,7 @@ from telegram.ext import (
 
 import engine_client
 from config import settings
+from i18n.loader import get_message
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -52,14 +53,20 @@ async def _bot_is_admin(message: Message) -> bool:
     return member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER)
 
 
-async def _notify_admins(message: Message, reasons: list[str]) -> None:
-    """Mention group admins about a flagged message."""
+async def _notify_admins(
+    message: Message, reasons: list[str], language: str = "en"
+) -> None:
+    """Mention group admins about a flagged message, in the detected language."""
     admins = await message.chat.get_administrators()
     mentions = " ".join(f"@{a.user.username}" for a in admins if a.user.username)
     reason_text = ", ".join(reasons)
-    await message.reply_text(
-        f"⚠️ Flagged content ({reason_text}). Admins: {mentions}"
-    )
+
+    if mentions:
+        msg = get_message("flagged_content", language, reasons=reason_text, mentions=mentions)
+    else:
+        msg = get_message("flagged_content_no_admins", language, reasons=reason_text)
+
+    await message.reply_text(msg)
 
 
 async def _handle_verdict(
@@ -68,6 +75,7 @@ async def _handle_verdict(
     """Delete the message or notify admins based on the engine verdict."""
     verdict = result.get("verdict", "allow")
     reasons = result.get("reasons", [])
+    language = result.get("language") or settings.bot_language
 
     if verdict == "allow":
         return
@@ -76,6 +84,7 @@ async def _handle_verdict(
         "moderation_action",
         verdict=verdict,
         reasons=reasons,
+        language=language,
         chat_id=message.chat_id,
         message_id=message.message_id,
     )
@@ -85,9 +94,9 @@ async def _handle_verdict(
             await message.delete()
             logger.info("message_deleted", message_id=message.message_id)
         else:
-            await _notify_admins(message, reasons)
+            await _notify_admins(message, reasons, language)
     elif verdict == "flag":
-        await _notify_admins(message, reasons)
+        await _notify_admins(message, reasons, language)
 
 
 # ---------------------------------------------------------------------------
