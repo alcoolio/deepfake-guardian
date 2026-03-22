@@ -4,8 +4,9 @@ Open-source content moderation system for **Telegram** and **WhatsApp** group ch
 Protects communities — especially those with minors — from violence, NSFW content,
 sexual violence, and deepfakes in text, images, and videos.
 
-> **Current state:** functional prototype. Deepfake detection and video moderation
-> are stubs. No tests, no API authentication, no GDPR persistence yet.
+> **Current state:** Phase 1 complete — tests, CI/CD, API key authentication, and
+> retry/resilience are in place. Deepfake detection and video moderation are still
+> stubs. No GDPR persistence yet.
 > See [ROADMAP.md](ROADMAP.md) for the full development plan.
 
 ---
@@ -121,20 +122,35 @@ All services use `.env` files. See `.env.example` files for full lists.
 Messages with any score **≥ 0.4** but below the delete threshold are **flagged** for
 admin review instead of being deleted.
 
+### Engine security
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `API_KEY` | _(empty)_ | Secret key required in `X-API-Key` header; leave empty to disable auth (dev only) |
+| `RATE_LIMIT` | `60/minute` | Max requests per IP per interval on moderation endpoints |
+
 ### Telegram bot
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `TELEGRAM_BOT_TOKEN` | Yes | Token from @BotFather |
 | `ENGINE_URL` | No | Engine URL (default: `http://engine:8000`) |
+| `ENGINE_API_KEY` | No | Must match `API_KEY` in `engine/.env` |
 
 ---
 
 ## Manual API Test
 
 ```bash
+# Without authentication (API_KEY not set):
 curl -s -X POST http://localhost:8000/moderate_text \
   -H "Content-Type: application/json" \
+  -d '{"text": "hello world"}' | python3 -m json.tool
+
+# With authentication:
+curl -s -X POST http://localhost:8000/moderate_text \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-here" \
   -d '{"text": "hello world"}' | python3 -m json.tool
 ```
 
@@ -154,6 +170,18 @@ Expected response:
 
 ---
 
+## Running Tests
+
+```bash
+# Engine
+cd engine && pip install -r requirements.txt && pytest
+
+# Telegram bot
+cd telegram-bot && pip install -r requirements.txt && pytest
+```
+
+---
+
 ## Known Limitations
 
 - **Deepfake detection is a stub** — returns a fixed score of `0.05`. The pipeline
@@ -161,9 +189,6 @@ Expected response:
   without changing the API. See `engine/classifiers.py`.
 - **Video moderation is a stub** — always returns `"allow"`. Frame extraction is not
   yet implemented. See `engine/routes.py`.
-- **No API authentication** — the engine is open; do not expose port 8000 publicly
-  without a firewall or reverse proxy.
-- **No tests or CI/CD** — coming in Phase 1 of the roadmap.
 - **English only** — i18n architecture with German as first language pack is Phase 2.
 - **Stateless** — no database. GDPR-compliant audit logging is Phase 3.
 
@@ -173,7 +198,7 @@ Expected response:
 
 | Phase | Focus | Status |
 |-------|-------|--------|
-| 1 | Tests, CI/CD, API auth, resilience | Planned |
+| 1 | Tests, CI/CD, API auth, resilience | **Done** |
 | 2 | i18n architecture, German + English language packs, cyberbullying | Planned |
 | 3 | GDPR compliance, database, warning/escalation system | Planned |
 | 4 | Real deepfake detection, video frame extraction | Planned |

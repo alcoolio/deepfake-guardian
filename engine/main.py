@@ -6,10 +6,13 @@ import logging
 
 import structlog
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from config import settings
-from routes import router
+from routes import limiter, router
 
 # ---------------------------------------------------------------------------
 # Logging setup (structlog wrapping stdlib)
@@ -28,15 +31,42 @@ structlog.configure(
 )
 logging.basicConfig(format="%(message)s", level=logging.INFO)
 
+log = structlog.get_logger()
+
 # ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
 app = FastAPI(
     title="Deepfake Guardian – Moderation Engine",
-    version="0.1.0",
+    version="0.2.0",
     description="Lightweight content moderation API for text, images, and video.",
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.include_router(router)
+
+
+# ---------------------------------------------------------------------------
+# API-key middleware (all routes except /health)
+# ---------------------------------------------------------------------------
+@app.middleware("http")
+async def require_api_key(request: Request, call_next):  # type: ignore[no-untyped-def]
+    """Reject requests that don't carry the correct X-API-Key header.
+
+    Authentication is skipped when API_KEY is not configured (empty string),
+    which is the default for local development.
+    """
+    if settings.api_key:
+        # /health is always public
+        if request.url.path != "/health":
+            provided = request.headers.get("X-API-Key", "")
+            if provided != settings.api_key:
+                log.warning("api_key_rejected", path=request.url.path)
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"detail": "Invalid or missing API key"},
+                )
+    return await call_next(request)
 
 
 @app.get("/health")
