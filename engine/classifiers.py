@@ -122,7 +122,7 @@ def _scores_from_zero_shot(clf: Any, text: str, label_map: dict[str, str]) -> di
 def _scores_from_multilabel(clf: Any, text: str, label_map: dict[str, str]) -> dict[str, float]:
     """Run a multi-label text-classification pipeline and map labels."""
     # top_k=None returns list of {label, score} dicts for every class
-    raw_list: list[dict[str, float]] = clf(text)
+    raw_list: list[dict[str, Any]] = clf(text)
     raw: dict[str, float] = {item["label"]: item["score"] for item in raw_list}
 
     scores: dict[str, float] = {
@@ -144,7 +144,7 @@ def _scores_from_multilabel(clf: Any, text: str, label_map: dict[str, str]) -> d
     return scores
 
 
-def classify_text(text: str, language: str | None = None) -> dict[str, float]:
+def classify_text(text: str, language: str | None = None) -> dict[str, Any]:
     """Classify text and return normalised scores.
 
     Routes through the i18n :class:`~i18n.registry.LanguageRegistry`.  Falls
@@ -163,20 +163,12 @@ def classify_text(text: str, language: str | None = None) -> dict[str, float]:
     from i18n.detector import detect_language
     from i18n.registry import LanguageRegistry
 
-    _zero_scores: dict[str, float] = {
-        "violence": 0.0,
-        "sexual_violence": 0.0,
-        "nsfw": 0.0,
-        "cyberbullying": 0.0,
-        "lang_code": language or "en",
-    }
-
     # 1. Detect language
     lang_code = language or detect_language(text)
     pack = LanguageRegistry.get(lang_code)
 
     # 2. Run ML classification
-    ml_scores: dict[str, float] = {
+    ml_scores: dict[str, Any] = {
         "violence": 0.0, "sexual_violence": 0.0, "nsfw": 0.0, "cyberbullying": 0.0
     }
 
