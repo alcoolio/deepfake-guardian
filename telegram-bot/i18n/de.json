@@ -1,0 +1,6 @@
+{
+  "flagged_content": "⚠️ Markierter Inhalt ({reasons}). Admins: {mentions}",
+  "flagged_content_no_admins": "⚠️ Markierter Inhalt ({reasons}).",
+  "cyberbullying_notice": "⚠️ Diese Nachricht könnte Cybermobbing enthalten ({reasons}). Admins: {mentions}",
+  "cyberbullying_notice_no_admins": "⚠️ Diese Nachricht könnte Cybermobbing enthalten ({reasons})."
+}

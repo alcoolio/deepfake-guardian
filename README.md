@@ -2,11 +2,11 @@
 
 Open-source content moderation system for **Telegram** and **WhatsApp** group chats.
 Protects communities — especially those with minors — from violence, NSFW content,
-sexual violence, and deepfakes in text, images, and videos.
+sexual violence, cyberbullying, and deepfakes in text, images, and videos.
 
-> **Current state:** Phase 1 complete — tests, CI/CD, API key authentication, and
-> retry/resilience are in place. Deepfake detection and video moderation are still
-> stubs. No GDPR persistence yet.
+> **Current state:** Phase 2 complete — i18n architecture, English + German language packs,
+> cyberbullying detection, and threshold profiles are all in place.
+> Deepfake detection and video moderation are still stubs. No GDPR persistence yet.
 > See [ROADMAP.md](ROADMAP.md) for the full development plan.
 
 ---
@@ -38,22 +38,55 @@ sexual violence, and deepfakes in text, images, and videos.
 
 1. A bot receives a message (text / image / video) in a group chat.
 2. It forwards the content to the engine API.
-3. The engine runs ML classifiers and returns a verdict:
+3. The engine detects the language, runs the appropriate ML classifier and
+   pattern matcher, and returns a verdict:
    - `"allow"` — content is safe, no action
    - `"flag"` — scores are elevated, admins are notified
    - `"delete"` — content exceeds thresholds, message is deleted (if bot has admin rights) or admins are @-mentioned
-4. The bot acts on the verdict.
+4. The bot acts on the verdict and sends admin notifications in the detected language.
 
 ### Moderation categories
 
 | Category | Model | Status |
 |----------|-------|--------|
-| Violence | BART zero-shot (text) / CLIP zero-shot (image) | Working |
-| Sexual violence | BART zero-shot (text) / CLIP zero-shot (image) | Working |
-| NSFW | BART zero-shot (text) / CLIP zero-shot (image) | Working |
+| Violence | BART zero-shot (EN) / German toxic model (DE) | ✅ Working |
+| Sexual violence | BART zero-shot (EN) / German toxic model (DE) | ✅ Working |
+| NSFW | BART zero-shot (EN) / German toxic model (DE) | ✅ Working |
+| Cyberbullying | Language-specific patterns + ML labels | ✅ Working |
 | Deepfake | — | **Stub** (fixed score 0.05) |
 | Video | — | **Stub** (always "allow") |
-| Cyberbullying | — | Planned (Phase 2) |
+
+---
+
+## Language Packs
+
+Deepfake Guardian uses a plugin architecture for language-aware moderation.
+Each language pack lives in `engine/i18n/packs/<lang_code>.py` and is
+auto-discovered at startup.
+
+**Adding a new language** requires only one file:
+
+```python
+# engine/i18n/packs/fr.py
+from i18n.base import HarmPattern, Helpline, LanguagePack
+
+class FrenchPack(LanguagePack):
+    lang_code = "fr"
+    lang_name = "Français"
+
+    def detect(self, text): ...
+    def get_classifier(self): ...
+    def get_labels(self): ...
+    def get_patterns(self): ...
+    def get_educational_messages(self): ...
+    def get_helplines(self): ...
+```
+
+Enable it via `ENABLED_LANGUAGES=en,de,fr` in `engine/.env`.
+
+**Currently bundled:**
+- 🇬🇧 English (`en`) — `facebook/bart-large-mnli` zero-shot + EN patterns
+- 🇩🇪 German (`de`) — `ml6team/distilbert-base-german-cased-toxic-comments` + DE patterns + Telefonseelsorge
 
 ---
 
@@ -83,8 +116,8 @@ Edit `telegram-bot/.env` and set `TELEGRAM_BOT_TOKEN`.
 docker compose up --build
 ```
 
-The engine downloads ML models on first run (~1.5 GB). Subsequent starts use a
-cached Docker volume.
+The engine downloads ML models on first run (~1.8 GB including the German model).
+Subsequent starts use a cached Docker volume.
 
 ### 3. Add the bot to a group
 
@@ -110,7 +143,28 @@ cd whatsapp-bot && npm install && npm run build && npm start
 
 All services use `.env` files. See `.env.example` files for full lists.
 
-### Engine thresholds (0–1 scale)
+### Engine — i18n & language packs
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `ENABLED_LANGUAGES` | `en,de` | Comma-separated list of active language pack codes |
+
+### Engine — moderation profiles
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `MODERATION_PROFILE` | `default` | Pre-configured threshold set: `minors_strict` \| `default` \| `permissive` |
+
+Profiles set all thresholds at once. Individual `THRESHOLD_*` env vars override
+specific values within the chosen profile.
+
+| Profile | Violence | Sexual violence | NSFW | Deepfake | Cyberbullying |
+|---------|----------|-----------------|------|----------|---------------|
+| `minors_strict` | 0.5 | 0.3 | 0.4 | 0.6 | 0.4 |
+| `default` | 0.7 | 0.5 | 0.6 | 0.8 | 0.6 |
+| `permissive` | 0.85 | 0.7 | 0.75 | 0.9 | 0.8 |
+
+### Engine — individual thresholds (0–1 scale)
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
@@ -118,11 +172,12 @@ All services use `.env` files. See `.env.example` files for full lists.
 | `THRESHOLD_SEXUAL_VIOLENCE` | `0.5` | Delete threshold for sexual violence |
 | `THRESHOLD_NSFW` | `0.6` | Delete threshold for NSFW |
 | `THRESHOLD_DEEPFAKE` | `0.8` | Delete threshold for deepfake |
+| `THRESHOLD_CYBERBULLYING` | `0.6` | Delete threshold for cyberbullying |
 
 Messages with any score **≥ 0.4** but below the delete threshold are **flagged** for
 admin review instead of being deleted.
 
-### Engine security
+### Engine — security
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
@@ -136,25 +191,30 @@ admin review instead of being deleted.
 | `TELEGRAM_BOT_TOKEN` | Yes | Token from @BotFather |
 | `ENGINE_URL` | No | Engine URL (default: `http://engine:8000`) |
 | `ENGINE_API_KEY` | No | Must match `API_KEY` in `engine/.env` |
+| `BOT_LANGUAGE` | No | Language for admin notifications: `en` or `de` (default: `en`) |
 
 ---
 
 ## Manual API Test
 
 ```bash
-# Without authentication (API_KEY not set):
+# Moderate English text
 curl -s -X POST http://localhost:8000/moderate_text \
   -H "Content-Type: application/json" \
-  -d '{"text": "hello world"}' | python3 -m json.tool
+  -d '{"text": "nobody likes you, you should die"}' | python3 -m json.tool
 
-# With authentication:
+# Moderate German text
 curl -s -X POST http://localhost:8000/moderate_text \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key-here" \
-  -d '{"text": "hello world"}' | python3 -m json.tool
+  -d '{"text": "keiner mag dich, du solltest sterben"}' | python3 -m json.tool
+
+# Explicit language hint
+curl -s -X POST http://localhost:8000/moderate_text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "hello world", "language": "en"}' | python3 -m json.tool
 ```
 
-Expected response:
+Expected response shape:
 ```json
 {
   "verdict": "allow",
@@ -163,8 +223,10 @@ Expected response:
     "violence": 0.02,
     "sexual_violence": 0.01,
     "nsfw": 0.01,
-    "deepfake_suspect": 0.0
-  }
+    "deepfake_suspect": 0.0,
+    "cyberbullying": 0.01
+  },
+  "language": "en"
 }
 ```
 
@@ -189,7 +251,6 @@ cd telegram-bot && pip install -r requirements.txt && pytest
   without changing the API. See `engine/classifiers.py`.
 - **Video moderation is a stub** — always returns `"allow"`. Frame extraction is not
   yet implemented. See `engine/routes.py`.
-- **English only** — i18n architecture with German as first language pack is Phase 2.
 - **Stateless** — no database. GDPR-compliant audit logging is Phase 3.
 
 ---
@@ -198,8 +259,8 @@ cd telegram-bot && pip install -r requirements.txt && pytest
 
 | Phase | Focus | Status |
 |-------|-------|--------|
-| 1 | Tests, CI/CD, API auth, resilience | **Done** |
-| 2 | i18n architecture, German + English language packs, cyberbullying | Planned |
+| 1 | Tests, CI/CD, API auth, resilience | ✅ Done |
+| 2 | i18n architecture, German + English language packs, cyberbullying | ✅ Done |
 | 3 | GDPR compliance, database, warning/escalation system | Planned |
 | 4 | Real deepfake detection, video frame extraction | Planned |
 | 5 | Admin dashboard, admin bot commands, educational feedback | Planned |
@@ -219,8 +280,7 @@ who need higher protection:
 - **Companies and teams** — internal communication channels
 - **Community groups** — hobby communities, local associations
 
-The moderation strictness can be tuned per group profile
-(planned in Phase 2: `minors_strict`, `minors_standard`, `default`, `permissive`).
+Use `MODERATION_PROFILE=minors_strict` for groups with minors.
 
 ---
 
@@ -241,7 +301,7 @@ The moderation strictness can be tuned per group profile
 Contributions are welcome. Please open an issue before starting large changes.
 
 Areas where help is especially needed:
-- Language packs (German is first priority, then French, Spanish, Turkish)
+- Language packs (French, Spanish, Turkish, Arabic are next priorities)
 - A real deepfake detection model integration
 - Tests
 - Documentation translations

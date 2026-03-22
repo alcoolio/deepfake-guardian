@@ -28,6 +28,87 @@ and [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ---
 
+## [0.3.0] — 2026-03-22 — Phase 2: i18n Architecture, Cyberbullying & Language Packs
+
+### Added
+
+**Engine — i18n Architecture:**
+- `engine/i18n/` package — language-agnostic moderation framework:
+  - `engine/i18n/base.py` — abstract `LanguagePack` base class with `detect()`,
+    `get_classifier()`, `get_labels()`, `get_patterns()`, `get_educational_messages()`,
+    `get_helplines()` interface.  `HarmPattern` and `Helpline` dataclasses.
+  - `engine/i18n/registry.py` — `LanguageRegistry` with auto-discovery: imports all
+    modules in `engine/i18n/packs/` at startup and registers every `LanguagePack`
+    subclass by its `lang_code`.  Adding a new language = one new file.
+  - `engine/i18n/detector.py` — `detect_language(text)` iterates enabled packs,
+    picks the highest-confidence match, falls back to `"en"`.
+- `engine/i18n/packs/en.py` — **English language pack** (`EnglishPack`):
+  - Migrates existing `facebook/bart-large-mnli` zero-shot classifier.
+  - English cyberbullying patterns: death threats, targeted insults, exclusion
+    language, extortion.
+  - Helplines: Crisis Text Line, Cyberbullying Research Center, StopBullying.gov.
+- `engine/i18n/packs/de.py` — **German language pack** (`GermanPack`):
+  - Uses `ml6team/distilbert-base-german-cased-toxic-comments` (~260 MB, CPU-compatible).
+  - German cyberbullying patterns: Todesdrohungen, Ausgrenzung, gezielte Beleidigungen,
+    Erpressung, Doxxing indicators.
+  - Helplines: Nummer gegen Kummer (116 111), Telefonseelsorge (0800 111 0 111),
+    Jugendnotmail, Klicksafe.
+
+**Engine — Cyberbullying Detection:**
+- `engine/cyberbullying.py` — `score_cyberbullying(text, lang_pack)`: combines
+  language-specific `HarmPattern` matches with cross-language structural patterns
+  (pile-on @mentions, repeated insults, all-caps shouting).
+- `ModerationScores` gains `cyberbullying: float` field (default `0.0` — fully
+  backward compatible).
+- `ModerationResult` gains `language: str | None` field (detected language code).
+- `TextRequest` gains optional `language: str | None` hint to bypass auto-detection.
+- New env var `THRESHOLD_CYBERBULLYING=0.6` (delete threshold for cyberbullying).
+- `verdict.py` updated to check cyberbullying threshold and include `"cyberbullying"`
+  / `"elevated_cyberbullying"` in reasons.
+
+**Engine — Threshold Profiles:**
+- `engine/profiles.py` — `ThresholdProfile` dataclass + three built-in profiles:
+  - `minors_strict` (violence=0.5, sexual_violence=0.3, nsfw=0.4, deepfake=0.6, cyberbullying=0.4)
+  - `default` (unchanged Phase 1 values + cyberbullying=0.6)
+  - `permissive` (higher thresholds for adult communities)
+- New env var `MODERATION_PROFILE=default` selects the active profile.  Individual
+  `THRESHOLD_*` env vars still override individual profile values.
+- `config.py` converted to `__init__`-based `Settings` to support profile-as-default
+  pattern.
+
+**Engine — Tests:**
+- `engine/tests/test_i18n.py` — 18 tests covering registry discovery, pack interface,
+  language detection with mocked `langdetect`.
+- `engine/tests/test_cyberbullying.py` — 11 tests covering English and German patterns,
+  structural patterns, graceful error handling.
+- `engine/tests/test_verdict.py` — 3 new tests for cyberbullying threshold, flag path,
+  and backward compatibility.
+- `engine/tests/test_classifiers.py` — updated for new `classify_text` signature and
+  return shape (includes `cyberbullying` and `lang_code` keys).
+
+**Telegram Bot — i18n:**
+- `telegram-bot/i18n/en.json` + `telegram-bot/i18n/de.json` — admin notification
+  message templates in English and German.
+- `telegram-bot/i18n/loader.py` — `get_message(key, lang, **kwargs)`: loads JSON
+  templates, falls back to English, formats with `str.format_map`.
+- `telegram-bot/main.py` — `_notify_admins()` now accepts a `language` parameter
+  and uses `get_message()` to send localised notifications.  Language is taken from
+  the engine's `ModerationResult.language` field (text moderation) or the
+  `BOT_LANGUAGE` env var fallback (image/video moderation).
+
+### Changed
+- `engine/classifiers.py` — `classify_text()` refactored to route through the
+  language registry; falls back to the legacy BART pipeline when no pack is found.
+- `engine/config.py` — converted to `__init__`-based `Settings`; new fields:
+  `enabled_languages`, `moderation_profile`, `threshold_cyberbullying`.
+- `engine/.env.example` — added `ENABLED_LANGUAGES`, `MODERATION_PROFILE`,
+  `THRESHOLD_CYBERBULLYING`.
+- `engine/requirements.txt` — added `langdetect==1.0.9`.
+- `telegram-bot/config.py` — added `bot_language` setting.
+- `telegram-bot/.env.example` — added `BOT_LANGUAGE=en`.
+
+---
+
 ## [0.2.0] — 2026-03-22 — Phase 1: Tests, CI/CD, API Auth, Resilience
 
 ### Added

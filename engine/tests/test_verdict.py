@@ -44,22 +44,23 @@ class TestDecideFlag:
         assert "elevated_sexual_violence" in result.reasons
 
     def test_just_below_delete_threshold(self):
-        # Default violence threshold is 0.7 — 0.69 should flag, not delete
-        scores = ModerationScores(violence=0.69, sexual_violence=0.0, nsfw=0.0, deepfake_suspect=0.0)
+        # Default violence threshold is 0.6 — 0.59 should flag, not delete
+        scores = ModerationScores(violence=0.59, sexual_violence=0.0, nsfw=0.0, deepfake_suspect=0.0)
         result = decide(scores)
         assert result.verdict == "flag"
 
 
 class TestDecideDelete:
     def test_violence_at_threshold(self):
-        scores = ModerationScores(violence=0.7, sexual_violence=0.0, nsfw=0.0, deepfake_suspect=0.0)
+        # Default threshold is 0.6 (same as sexual_violence and nsfw)
+        scores = ModerationScores(violence=0.6, sexual_violence=0.0, nsfw=0.0, deepfake_suspect=0.0)
         result = decide(scores)
         assert result.verdict == "delete"
         assert "violence" in result.reasons
 
     def test_sexual_violence_at_threshold(self):
-        # Default threshold is 0.5
-        scores = ModerationScores(violence=0.0, sexual_violence=0.5, nsfw=0.0, deepfake_suspect=0.0)
+        # Default threshold is 0.6 (same as violence and nsfw)
+        scores = ModerationScores(violence=0.0, sexual_violence=0.6, nsfw=0.0, deepfake_suspect=0.0)
         result = decide(scores)
         assert result.verdict == "delete"
         assert "sexual_violence" in result.reasons
@@ -86,7 +87,38 @@ class TestDecideDelete:
         assert "sexual_violence" in result.reasons
 
     def test_scores_preserved_in_result(self):
-        scores = ModerationScores(violence=0.75, sexual_violence=0.0, nsfw=0.0, deepfake_suspect=0.0)
+        scores = ModerationScores(violence=0.65, sexual_violence=0.0, nsfw=0.0, deepfake_suspect=0.0)
         result = decide(scores)
-        assert result.scores.violence == pytest.approx(0.75)
+        assert result.scores.violence == pytest.approx(0.65)
         assert result.verdict == "delete"
+
+    def test_cyberbullying_at_threshold(self):
+        # Default cyberbullying threshold is 0.6
+        scores = ModerationScores(
+            violence=0.0, sexual_violence=0.0, nsfw=0.0, deepfake_suspect=0.0, cyberbullying=0.6
+        )
+        result = decide(scores)
+        assert result.verdict == "delete"
+        assert "cyberbullying" in result.reasons
+
+    def test_cyberbullying_below_threshold_flags(self):
+        # 0.4 is below the delete threshold (0.6) but above the flag threshold
+        scores = ModerationScores(
+            violence=0.0, sexual_violence=0.0, nsfw=0.0, deepfake_suspect=0.0, cyberbullying=0.4
+        )
+        result = decide(scores)
+        assert result.verdict == "flag"
+        assert "elevated_cyberbullying" in result.reasons
+
+
+class TestDecideBackwardCompatibility:
+    """Ensure old callers that omit cyberbullying still work (default = 0.0)."""
+
+    def test_cyberbullying_defaults_to_zero(self):
+        scores = ModerationScores(violence=0.0, sexual_violence=0.0, nsfw=0.0, deepfake_suspect=0.0)
+        assert scores.cyberbullying == pytest.approx(0.0)
+
+    def test_result_language_defaults_to_none(self):
+        scores = ModerationScores()
+        result = decide(scores)
+        assert result.language is None

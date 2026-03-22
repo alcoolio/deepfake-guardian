@@ -22,18 +22,25 @@ router = APIRouter()
 @router.post("/moderate_text", response_model=ModerationResult)
 async def moderate_text(request: Request, req: TextRequest) -> ModerationResult:
     """Classify plain text and return a moderation verdict."""
-    text_scores = classify_text(req.text)
+    from i18n.detector import detect_language
+
+    lang_code = req.language or detect_language(req.text)
+    text_scores = classify_text(req.text, lang_code)
+
     scores = ModerationScores(
         violence=text_scores["violence"],
         sexual_violence=text_scores["sexual_violence"],
         nsfw=text_scores["nsfw"],
         deepfake_suspect=0.0,
+        cyberbullying=text_scores.get("cyberbullying", 0.0),
     )
     result = decide(scores)
+    result = result.model_copy(update={"language": lang_code})
     logger.info(
         "text_moderation",
         verdict=result.verdict,
         reasons=result.reasons,
+        language=lang_code,
         text_preview=req.text[:80],
     )
     return result
@@ -54,6 +61,7 @@ async def moderate_image(request: Request, req: ImageRequest) -> ModerationResul
         sexual_violence=img_scores["sexual_violence"],
         nsfw=img_scores["nsfw"],
         deepfake_suspect=deepfake_score,
+        cyberbullying=0.0,
     )
     result = decide(scores)
     logger.info(
@@ -82,6 +90,7 @@ async def moderate_video(request: Request, req: VideoRequest) -> ModerationResul
         sexual_violence=0.0,
         nsfw=0.0,
         deepfake_suspect=0.0,
+        cyberbullying=0.0,
     )
     result = decide(scores)
     logger.info(
