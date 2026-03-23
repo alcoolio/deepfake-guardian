@@ -20,6 +20,10 @@ and [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 - `CHANGELOG.md` — this file.
 
 ### Changed
+- `engine/profiles.py` — rebalanced `default` profile thresholds: violence and
+  sexual violence aligned at `0.6`; NSFW lowered to `0.4` (more sensitive); deepfake
+  set to `0.65` (mid); cyberbullying raised to `0.8` (high confidence required before
+  deletion to reduce false positives).
 - `README.md` — rewritten in English as the primary repository language; added
   moderation category status table, known limitations section, target audience
   section, contributing guidance, and security & privacy notes.

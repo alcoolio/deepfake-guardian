@@ -82,10 +82,11 @@ GET  /health          (health check)
 
 **Default thresholds** (all overridable via env):
 ```
-THRESHOLD_VIOLENCE        = 0.7
-THRESHOLD_SEXUAL_VIOLENCE = 0.5
-THRESHOLD_NSFW            = 0.6
-THRESHOLD_DEEPFAKE        = 0.8
+THRESHOLD_VIOLENCE        = 0.6
+THRESHOLD_SEXUAL_VIOLENCE = 0.6
+THRESHOLD_NSFW            = 0.4
+THRESHOLD_DEEPFAKE        = 0.65
+THRESHOLD_CYBERBULLYING   = 0.8
 ```
 
 ### `telegram-bot/`
@@ -192,10 +193,11 @@ curl -X POST http://localhost:8000/moderate_text \
 | `HOST` | `0.0.0.0` | Bind address |
 | `PORT` | `8000` | Listen port |
 | `LOG_LEVEL` | `info` | Logging verbosity |
-| `THRESHOLD_VIOLENCE` | `0.7` | Delete threshold for violence (0–1) |
-| `THRESHOLD_SEXUAL_VIOLENCE` | `0.5` | Delete threshold for sexual violence |
-| `THRESHOLD_NSFW` | `0.6` | Delete threshold for NSFW |
-| `THRESHOLD_DEEPFAKE` | `0.8` | Delete threshold for deepfake |
+| `THRESHOLD_VIOLENCE` | `0.6` | Delete threshold for violence (0–1) |
+| `THRESHOLD_SEXUAL_VIOLENCE` | `0.6` | Delete threshold for sexual violence |
+| `THRESHOLD_NSFW` | `0.4` | Delete threshold for NSFW |
+| `THRESHOLD_DEEPFAKE` | `0.65` | Delete threshold for deepfake |
+| `THRESHOLD_CYBERBULLYING` | `0.8` | Delete threshold for cyberbullying |
 
 ### Telegram bot (`telegram-bot/.env`)
 
