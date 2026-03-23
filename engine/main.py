@@ -74,7 +74,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 # ---------------------------------------------------------------------------
 app = FastAPI(
     title="Deepfake Guardian – Moderation Engine",
-    version="0.4.0",
+    version="0.5.0",
     description="Lightweight content moderation API for text, images, and video.",
     lifespan=lifespan,
 )

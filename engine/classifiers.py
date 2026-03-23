@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 _fallback_text_classifier: Any = None
 _image_classifier: Any = None
+_violence_classifier: Any = None
 
 
 def _get_fallback_text_classifier() -> Any:
@@ -61,6 +62,24 @@ def _get_image_classifier() -> Any:
         except Exception:
             logger.warning("Could not load image classifier – using stub scores")
     return _image_classifier
+
+
+def _get_violence_classifier() -> Any:
+    """Return a CLIP zero-shot classifier for image violence detection (cached)."""
+    global _violence_classifier
+    if _violence_classifier is None:
+        try:
+            from transformers import pipeline
+
+            _violence_classifier = pipeline(
+                "zero-shot-image-classification",
+                model="openai/clip-vit-base-patch32",
+                device=-1,
+            )
+            logger.info("Violence classifier loaded: openai/clip-vit-base-patch32")
+        except Exception:
+            logger.warning("Could not load violence classifier – violence scores will be 0.0")
+    return _violence_classifier
 
 
 # ---------------------------------------------------------------------------
@@ -214,42 +233,59 @@ def classify_text(text: str, language: str | None = None) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+_VIOLENCE_LABELS = ["violence", "gore", "fighting", "safe", "peaceful"]
+
+
 def classify_image(image: Image.Image) -> dict[str, float]:
     """Classify an image and return normalised scores.
 
     Returns dict with keys: violence, sexual_violence, nsfw.
     """
+    # NSFW detection
+    nsfw_score = 0.0
     clf = _get_image_classifier()
-    if clf is None:
-        return {"violence": 0.0, "sexual_violence": 0.0, "nsfw": 0.0}
+    if clf is not None:
+        results = clf(image)
+        label_scores: dict[str, float] = {r["label"].lower(): r["score"] for r in results}
+        nsfw_score = float(label_scores.get("nsfw", 0.0))
 
-    results = clf(image)
-    label_scores: dict[str, float] = {r["label"].lower(): r["score"] for r in results}
-    nsfw_score = float(label_scores.get("nsfw", 0.0))
+    # Violence detection via CLIP zero-shot
+    violence_score = 0.0
+    v_clf = _get_violence_classifier()
+    if v_clf is not None:
+        try:
+            v_results = v_clf(image, candidate_labels=_VIOLENCE_LABELS)
+            v_scores: dict[str, float] = {r["label"]: r["score"] for r in v_results}
+            violence_score = float(max(
+                v_scores.get("violence", 0.0),
+                v_scores.get("gore", 0.0),
+                v_scores.get("fighting", 0.0),
+            ))
+        except Exception:
+            logger.warning("Violence classification failed")
 
     return {
-        "violence": 0.0,  # This model doesn't detect violence — extend in Phase 4
+        "violence": violence_score,
         "sexual_violence": nsfw_score * 0.5,  # Rough heuristic
         "nsfw": nsfw_score,
     }
 
 
 # ---------------------------------------------------------------------------
-# Deepfake detection (stub)
+# Deepfake detection
 # ---------------------------------------------------------------------------
 
 
 def detect_deepfake_suspect(image: Image.Image) -> float:
     """Detect whether an image may be a deepfake.
 
-    TODO: Replace this stub with a real deepfake detection model, e.g.:
-      - Microsoft FaceXRay
-      - Sensity deepfake detector
-      - A fine-tuned EfficientNet on FaceForensics++
-      - Any ONNX / TorchScript model that outputs a probability score
+    Pipeline:
+      1. Extract faces from the image using MediaPipe.
+      2. If no faces found, return 0.05 (no face = unlikely deepfake).
+      3. Run the configured deepfake detector on each face crop.
+      4. Return the maximum score across all detected faces.
 
-    Current implementation: returns a fixed low score (0.05) so the pipeline
-    is wired end-to-end and ready for a real model drop-in.
+    The detector provider is selected via the ``DEEPFAKE_PROVIDER`` env var.
 
     Args:
         image: A PIL RGB image.
@@ -257,6 +293,25 @@ def detect_deepfake_suspect(image: Image.Image) -> float:
     Returns:
         A float between 0.0 and 1.0 indicating deepfake likelihood.
     """
-    _ = np.array(image)  # Placeholder — proves the image is valid
-    logger.info("detect_deepfake_suspect called (stub) — returning 0.05")
-    return 0.05
+    from deepfake.face_extractor import extract_faces
+    from deepfake.factory import get_detector
+
+    faces = extract_faces(image)
+    if not faces:
+        logger.debug("No faces detected — returning baseline deepfake score 0.05")
+        return 0.05
+
+    detector = get_detector()
+    scores = detector.detect(faces)
+
+    if not scores:
+        return 0.05
+
+    result = max(scores)
+    logger.info(
+        "Deepfake detection: %d face(s), max score=%.3f (provider=%s)",
+        len(faces),
+        result,
+        detector.name,
+    )
+    return result

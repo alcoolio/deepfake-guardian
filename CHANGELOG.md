@@ -28,6 +28,80 @@ and [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ---
 
+## [0.5.0] — 2026-03-23 — Phase 4: Deepfake Detection & Video Analysis
+
+### Added
+
+**Engine — Deepfake Detection Provider System (`engine/deepfake/`):**
+- `engine/deepfake/base.py` — `DeepfakeDetector` ABC with `detect(face_images) -> list[float]`
+  and `is_available() -> bool` interface.
+- `engine/deepfake/factory.py` — factory function returning cached singleton detector.
+  Reads `DEEPFAKE_PROVIDER` env var (`local` | `sightengine` | `api` | `stub`).
+  Falls back to stub with warning when chosen provider is unavailable.
+  `StubDetector` built in for CI/testing (returns 0.05).
+- `engine/deepfake/face_extractor.py` — shared face extraction using MediaPipe
+  `FaceDetection`. Returns list of cropped face PIL images with configurable
+  minimum face size and padding.
+- `engine/deepfake/local_detector.py` — `LocalOnnxDetector`: runs EfficientNet-B0
+  ONNX model (~20 MB) on CPU via `onnxruntime`. Privacy-first default — face
+  images never leave the server. ImageNet normalisation, sigmoid output.
+- `engine/deepfake/cloud_sightengine.py` — `SightEngineDetector`: calls SightEngine
+  deepfake API. GDPR warning logged on startup. Requires `SIGHTENGINE_API_USER`
+  and `SIGHTENGINE_API_SECRET`.
+- `engine/deepfake/cloud_generic.py` — `GenericApiDetector`: sends face crops as
+  base64 to a user-configured HTTP endpoint. Supports custom score path extraction.
+
+**Engine — Video Processing (`engine/video_processing.py`):**
+- `decode_video(video_base64, video_url)` — decode/download video data.
+- `extract_frames(video_data)` — OpenCV-based frame sampling: 1 frame every
+  `FRAME_INTERVAL` seconds (default 2.0), capped at `MAX_FRAMES` (default 10),
+  rejects videos longer than `MAX_VIDEO_DURATION` (default 300s). Temp files
+  cleaned up in `finally` block.
+- `moderate_video_frames(frames)` — runs `classify_image` + `detect_deepfake_suspect`
+  on each frame, aggregates via max per category.
+
+**Engine — Image Violence Detection:**
+- `_get_violence_classifier()` — CLIP zero-shot classifier (`openai/clip-vit-base-patch32`)
+  with violence/gore/fighting labels. `classify_image()` now returns non-zero
+  violence scores.
+
+**Engine — Tests:**
+- `engine/tests/test_deepfake_factory.py` — factory provider selection, fallback to stub,
+  caching, unknown provider handling.
+- `engine/tests/test_face_extractor.py` — face detection with mocked MediaPipe, no-face
+  returns empty, tiny face skipping.
+- `engine/tests/test_local_detector.py` — ONNX preprocessing shape, sigmoid, mocked
+  session, unavailable fallback.
+- `engine/tests/test_cloud_detector.py` — SightEngine + generic API: response parsing,
+  error handling, availability checks.
+- `engine/tests/test_video_processing.py` — frame extraction, max frames cap, score
+  aggregation, empty frames handling.
+
+### Changed
+- `engine/classifiers.py` — `detect_deepfake_suspect()` rewired from stub to real
+  pipeline: extract faces → run provider → return max score. `classify_image()`
+  now includes violence detection via CLIP zero-shot.
+- `engine/config.py` — new settings: `deepfake_provider`, `deepfake_model_path`,
+  `sightengine_api_user`, `sightengine_api_secret`, `deepfake_api_url`,
+  `deepfake_api_key`, `deepfake_api_score_path`, `frame_interval`, `max_frames`,
+  `max_video_duration`.
+- `engine/routes.py` — `/moderate_video` replaced: decode → extract frames →
+  classify + deepfake → aggregate → verdict. No longer a stub.
+- `engine/requirements.txt` — added `onnxruntime==1.17.0`,
+  `opencv-python-headless==4.9.0.80`, `mediapipe==0.10.11`.
+- `engine/Dockerfile` — added `ffmpeg` to apt-get install.
+- `engine/.env.example` — added deepfake provider and video processing env vars
+  with GDPR privacy warnings for cloud providers.
+- `docker-compose.yml` — added `onnx-models` volume for ONNX model caching.
+- `engine/tests/conftest.py` — mocks for deepfake factory and face extractor
+  added to `client` and `client_with_key` fixtures.
+- `engine/tests/test_classifiers.py` — updated deepfake and violence tests for
+  new provider-based implementation.
+- `engine/tests/test_routes.py` — updated video moderation tests for real pipeline.
+- `ROADMAP.md` — Phase 4 marked ✅ complete.
+
+---
+
 ## [0.4.0] — 2026-03-23 — Phase 3: GDPR Compliance, Database & Warning System
 
 ### Added

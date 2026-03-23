@@ -4,9 +4,9 @@ Open-source content moderation system for **Telegram** and **WhatsApp** group ch
 Protects communities — especially those with minors — from violence, NSFW content,
 sexual violence, cyberbullying, and deepfakes in text, images, and videos.
 
-> **Current state:** Phase 3 complete — GDPR-compliant audit database, warning/escalation
-> system, `/privacy` and `/delete_my_data` bot commands, and automatic data retention
-> cleanup are all in place. Deepfake detection and video moderation are still stubs.
+> **Current state:** Phase 4 complete — real deepfake detection with pluggable providers
+> (local ONNX, SightEngine, generic API), video frame extraction, and image violence
+> detection are all in place on top of GDPR-compliant audit logging and the i18n framework.
 > See [ROADMAP.md](ROADMAP.md) for the full development plan.
 
 ---
@@ -53,8 +53,8 @@ sexual violence, cyberbullying, and deepfakes in text, images, and videos.
 | Sexual violence | BART zero-shot (EN) / German toxic model (DE) | ✅ Working |
 | NSFW | BART zero-shot (EN) / German toxic model (DE) | ✅ Working |
 | Cyberbullying | Language-specific patterns + ML labels | ✅ Working |
-| Deepfake | — | **Stub** (fixed score 0.05) |
-| Video | — | **Stub** (always "allow") |
+| Deepfake | EfficientNet-B0 ONNX / SightEngine / custom API | ✅ Working (pluggable providers) |
+| Video | OpenCV frame extraction + per-frame analysis | ✅ Working |
 
 ---
 
@@ -94,8 +94,26 @@ Enable it via `ENABLED_LANGUAGES=en,de,fr` in `engine/.env`.
 
 ### Prerequisites
 
-- Docker & Docker Compose, **or** Python 3.11+ and Node.js 18+
+- Docker & Docker Compose, **or** Python 3.11+, Node.js 18+, and ffmpeg
 - A Telegram bot token from [@BotFather](https://t.me/BotFather)
+
+### System Requirements
+
+| Resource | Minimum | Recommended | Notes |
+|----------|---------|-------------|-------|
+| **RAM** | 4 GB | 8 GB | ML models (PyTorch, BART, CLIP) use ~2–3 GB; deepfake detection adds ~500 MB |
+| **CPU** | 2 cores | 4+ cores | ONNX inference is ~20–50ms/face on modern CPU; video processing benefits from parallelism |
+| **Disk** | 4 GB free | 6 GB free | ML models ~2.5 GB + ONNX model ~20 MB + system dependencies |
+| **GPU** | Not required | Optional | `onnxruntime` uses CPU by default; swap to `onnxruntime-gpu` for NVIDIA acceleration |
+
+Docker handles all system dependencies (ffmpeg, etc.) automatically. For bare-metal:
+```bash
+# Ubuntu/Debian
+sudo apt-get install ffmpeg
+
+# macOS
+brew install ffmpeg
+```
 
 ### 1. Clone and configure
 
@@ -177,6 +195,29 @@ specific values within the chosen profile.
 Messages with any score **≥ 0.4** but below the delete threshold are **flagged** for
 admin review instead of being deleted.
 
+### Engine — deepfake detection
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `DEEPFAKE_PROVIDER` | `local` | Detection provider: `local` \| `sightengine` \| `api` \| `stub` |
+| `DEEPFAKE_MODEL_PATH` | _(auto)_ | Path to ONNX model file (auto-downloaded if empty) |
+| `SIGHTENGINE_API_USER` | _(empty)_ | SightEngine API user (only if provider=sightengine) |
+| `SIGHTENGINE_API_SECRET` | _(empty)_ | SightEngine API secret (only if provider=sightengine) |
+| `DEEPFAKE_API_URL` | _(empty)_ | Custom API endpoint (only if provider=api) |
+| `DEEPFAKE_API_KEY` | _(empty)_ | Bearer token for custom API (only if provider=api) |
+
+**Privacy note:** The `local` provider (default) runs all inference on-device — face
+images never leave the server. Cloud providers (`sightengine`, `api`) send face crops
+to external services. Use `local` for GDPR-sensitive deployments with minors.
+
+### Engine — video processing
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `FRAME_INTERVAL` | `2.0` | Seconds between sampled frames |
+| `MAX_FRAMES` | `10` | Maximum frames to analyse per video |
+| `MAX_VIDEO_DURATION` | `300` | Maximum video duration in seconds (longer videos are rejected) |
+
 ### Engine — security
 
 | Variable | Default | Meaning |
@@ -246,12 +287,10 @@ cd telegram-bot && pip install -r requirements.txt && pytest
 
 ## Known Limitations
 
-- **Deepfake detection is a stub** — returns a fixed score of `0.05`. The pipeline
-  is wired so a real model (e.g. EfficientNet on FaceForensics++) can be dropped in
-  without changing the API. See `engine/classifiers.py`.
-- **Video moderation is a stub** — always returns `"allow"`. Frame extraction is not
-  yet implemented. See `engine/routes.py`.
-- **Stateless** — no database. GDPR-compliant audit logging is Phase 3.
+- **Local deepfake model requires download** — the ONNX model (~20 MB) is downloaded
+  on first use. Set `DEEPFAKE_PROVIDER=stub` for CI/testing without models.
+- **No admin dashboard yet** — planned for Phase 5.
+- **WhatsApp bot** has fewer features than the Telegram bot (no GDPR commands yet).
 
 ---
 
@@ -262,7 +301,7 @@ cd telegram-bot && pip install -r requirements.txt && pytest
 | 1 | Tests, CI/CD, API auth, resilience | ✅ Done |
 | 2 | i18n architecture, German + English language packs, cyberbullying | ✅ Done |
 | 3 | GDPR compliance, database, warning/escalation system | ✅ Done |
-| 4 | Real deepfake detection, video frame extraction | Planned |
+| 4 | Real deepfake detection, video frame extraction | ✅ Done |
 | 5 | Admin dashboard, admin bot commands, educational feedback | Planned |
 | 6 | WhatsApp parity, Signal & Discord bots, community language packs | Planned |
 

@@ -1,0 +1,61 @@
+"""Tests for the deepfake detection factory."""
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from deepfake.base import DeepfakeDetector
+from deepfake.factory import StubDetector, get_detector, reset_detector
+
+
+@pytest.fixture(autouse=True)
+def _reset():
+    """Reset the cached detector between tests."""
+    reset_detector()
+    yield
+    reset_detector()
+
+
+class TestStubDetector:
+    def test_returns_005_per_face(self):
+        from PIL import Image
+
+        det = StubDetector()
+        faces = [Image.new("RGB", (10, 10))] * 3
+        scores = det.detect(faces)
+        assert scores == [0.05, 0.05, 0.05]
+
+    def test_is_available(self):
+        assert StubDetector().is_available() is True
+
+
+class TestFactory:
+    def test_stub_provider(self):
+        with patch("config.settings") as mock_settings:
+            mock_settings.deepfake_provider = "stub"
+            det = get_detector()
+        assert isinstance(det, StubDetector)
+        assert det.name == "stub"
+
+    def test_unknown_provider_falls_back_to_stub(self):
+        with patch("config.settings") as mock_settings:
+            mock_settings.deepfake_provider = "nonexistent"
+            det = get_detector()
+        assert isinstance(det, StubDetector)
+
+    def test_unavailable_provider_falls_back_to_stub(self):
+        """When is_available() returns False, factory falls back to stub."""
+        with patch("config.settings") as mock_settings:
+            mock_settings.deepfake_provider = "sightengine"
+            mock_settings.sightengine_api_user = ""
+            mock_settings.sightengine_api_secret = ""
+            det = get_detector()
+        assert isinstance(det, StubDetector)
+
+    def test_detector_is_cached(self):
+        with patch("config.settings") as mock_settings:
+            mock_settings.deepfake_provider = "stub"
+            det1 = get_detector()
+            det2 = get_detector()
+        assert det1 is det2

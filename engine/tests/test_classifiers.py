@@ -135,8 +135,11 @@ class TestClassifyText:
 
 
 class TestClassifyImage:
-    def test_returns_zeros_when_classifier_unavailable(self):
-        with patch("classifiers._get_image_classifier", return_value=None):
+    def test_returns_zeros_when_classifiers_unavailable(self):
+        with (
+            patch("classifiers._get_image_classifier", return_value=None),
+            patch("classifiers._get_violence_classifier", return_value=None),
+        ):
             result = classify_image(_make_image())
         assert result == {"violence": 0.0, "sexual_violence": 0.0, "nsfw": 0.0}
 
@@ -144,27 +147,61 @@ class TestClassifyImage:
         mock_clf = MagicMock(
             return_value=[{"label": "nsfw", "score": 0.7}, {"label": "normal", "score": 0.3}]
         )
-        with patch("classifiers._get_image_classifier", return_value=mock_clf):
+        with (
+            patch("classifiers._get_image_classifier", return_value=mock_clf),
+            patch("classifiers._get_violence_classifier", return_value=None),
+        ):
             result = classify_image(_make_image())
         assert result["nsfw"] == pytest.approx(0.7)
         assert result["sexual_violence"] == pytest.approx(0.35)  # nsfw * 0.5
         assert result["violence"] == 0.0
 
-    def test_violence_always_zero(self):
-        mock_clf = MagicMock(return_value=[{"label": "normal", "score": 1.0}])
-        with patch("classifiers._get_image_classifier", return_value=mock_clf):
+    def test_violence_from_clip_classifier(self):
+        """Violence classifier returns a non-zero score from CLIP zero-shot."""
+        mock_nsfw = MagicMock(return_value=[{"label": "normal", "score": 1.0}])
+        mock_violence = MagicMock(
+            return_value=[
+                {"label": "violence", "score": 0.8},
+                {"label": "gore", "score": 0.3},
+                {"label": "fighting", "score": 0.1},
+                {"label": "safe", "score": 0.05},
+                {"label": "peaceful", "score": 0.02},
+            ]
+        )
+        with (
+            patch("classifiers._get_image_classifier", return_value=mock_nsfw),
+            patch("classifiers._get_violence_classifier", return_value=mock_violence),
+        ):
             result = classify_image(_make_image())
-        assert result["violence"] == 0.0
+        assert result["violence"] == pytest.approx(0.8)
 
 
 class TestDetectDeepfakeSuspect:
-    def test_stub_returns_005(self):
-        img = _make_image()
-        score = detect_deepfake_suspect(img)
+    def test_no_faces_returns_005(self):
+        """When no faces are detected, returns baseline 0.05."""
+        with patch("deepfake.face_extractor.extract_faces", return_value=[]):
+            score = detect_deepfake_suspect(_make_image())
         assert score == pytest.approx(0.05)
 
+    def test_returns_max_of_face_scores(self):
+        """When faces detected, returns max score from detector."""
+        face1 = _make_image(50, 50)
+        face2 = _make_image(50, 50)
+
+        mock_detector = MagicMock()
+        mock_detector.detect.return_value = [0.3, 0.9]
+        mock_detector.name = "mock"
+
+        with (
+            patch("deepfake.face_extractor.extract_faces", return_value=[face1, face2]),
+            patch("deepfake.factory.get_detector", return_value=mock_detector),
+        ):
+            score = detect_deepfake_suspect(_make_image())
+        assert score == pytest.approx(0.9)
+
     def test_accepts_any_pil_image(self):
-        for size in [(1, 1), (100, 100), (640, 480)]:
-            img = _make_image(*size)
-            score = detect_deepfake_suspect(img)
-            assert 0.0 <= score <= 1.0
+        with patch("deepfake.face_extractor.extract_faces", return_value=[]):
+            for size in [(1, 1), (100, 100), (640, 480)]:
+                img = _make_image(*size)
+                score = detect_deepfake_suspect(img)
+                assert 0.0 <= score <= 1.0

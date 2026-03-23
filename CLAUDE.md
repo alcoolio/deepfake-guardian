@@ -46,7 +46,7 @@ The central brain. All bots call this API to get moderation decisions.
 |------|---------|
 | `main.py` | FastAPI app factory, mounts router, configures structlog |
 | `routes.py` | Three POST endpoints: `/moderate_text`, `/moderate_image`, `/moderate_video` |
-| `classifiers.py` | ML classifiers: text (BART zero-shot), image (CLIP zero-shot), deepfake stub |
+| `classifiers.py` | ML classifiers: text (BART zero-shot), image (CLIP zero-shot + violence), deepfake (provider-based) |
 | `verdict.py` | `decide(scores)` → `"allow"` / `"flag"` / `"delete"` based on thresholds |
 | `models.py` | Pydantic request/response schemas (`ModerationResult`, `ModerationScores`) |
 | `config.py` | `Settings` class — all config from env vars with sane defaults |
@@ -115,15 +115,17 @@ Lives in `src/`. See its own `README.md` for setup details.
 
 | Area | Status |
 |------|--------|
-| Deepfake detection | **Stub** — always returns `0.05`. See `engine/classifiers.py:detect_deepfake_suspect()` |
-| Video moderation | **Stub** — always returns `"allow"`. Frame extraction not implemented. See `engine/routes.py:moderate_video()` |
-| Image violence score | Always returns `0.0` — model not wired |
-| Tests | None yet |
-| CI/CD | None yet |
-| API authentication | None — engine is open |
-| GDPR / data persistence | None — stateless |
-| i18n | English-only UI strings, hardcoded |
-| Cyberbullying detection | Not implemented |
+| Deepfake detection | ✅ Provider-based: `local` (ONNX), `sightengine`, `api`, `stub`. See `engine/deepfake/` |
+| Video moderation | ✅ OpenCV frame extraction + per-frame analysis. See `engine/video_processing.py` |
+| Image violence score | ✅ CLIP zero-shot classifier. See `engine/classifiers.py:_get_violence_classifier()` |
+| Tests | ✅ pytest suite with mocked ML models |
+| CI/CD | ✅ GitHub Actions |
+| API authentication | ✅ `API_KEY` middleware |
+| GDPR / data persistence | ✅ Async SQLAlchemy + GDPR service |
+| i18n | ✅ Language pack architecture (EN, DE) |
+| Cyberbullying detection | ✅ Pattern + ML hybrid |
+| Admin dashboard | Not implemented — Phase 5 |
+| WhatsApp GDPR commands | Not implemented — Phase 6 |
 
 ---
 
