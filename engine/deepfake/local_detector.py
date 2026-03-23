@@ -34,7 +34,7 @@ def _preprocess(face: Image.Image) -> np.ndarray:
     Returns:
         numpy array of shape (1, 3, 224, 224) float32.
     """
-    face_resized = face.resize((INPUT_SIZE, INPUT_SIZE), Image.BILINEAR)
+    face_resized = face.resize((INPUT_SIZE, INPUT_SIZE), Image.Resampling.BILINEAR)
     arr = np.array(face_resized, dtype=np.float32) / 255.0
     arr = (arr - _MEAN) / _STD
     # HWC -> CHW -> NCHW

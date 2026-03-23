@@ -41,7 +41,7 @@ def get_detector() -> DeepfakeDetector:
     if provider == "local":
         from deepfake.local_detector import LocalOnnxDetector
 
-        det = LocalOnnxDetector()
+        det: DeepfakeDetector = LocalOnnxDetector()
     elif provider == "sightengine":
         from deepfake.cloud_sightengine import SightEngineDetector
 

@@ -29,6 +29,8 @@ def _extract_nested(data: dict, path: str) -> float:
             current = current.get(key, 0.0)
         else:
             return 0.0
+    if isinstance(current, dict):
+        return 0.0
     return float(current)
 
 
