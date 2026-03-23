@@ -55,7 +55,8 @@ def client():
 
         from main import app
 
-        yield TestClient(app)
+        with TestClient(app) as c:
+            yield c
 
 
 @pytest.fixture()
@@ -78,7 +79,8 @@ def client_with_key(monkeypatch):
 
         from main import app
 
-        yield TestClient(app)
+        with TestClient(app) as c:
+            yield c
 
         # Restore
         config_module.settings.api_key = ""
