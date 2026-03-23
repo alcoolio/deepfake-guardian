@@ -14,7 +14,6 @@ import io
 import logging
 from typing import Any
 
-import numpy as np
 from PIL import Image
 
 logger = logging.getLogger(__name__)

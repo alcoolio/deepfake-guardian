@@ -9,9 +9,7 @@ import base64
 import logging
 import os
 import tempfile
-from typing import Any
 
-import numpy as np
 from PIL import Image
 
 logger = logging.getLogger(__name__)

@@ -1,11 +1,10 @@
 """Tests for the deepfake detection factory."""
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from deepfake.base import DeepfakeDetector
 from deepfake.factory import StubDetector, get_detector, reset_detector
 
 

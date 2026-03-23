@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from PIL import Image
 
 from deepfake.face_extractor import extract_faces
