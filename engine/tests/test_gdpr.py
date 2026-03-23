@@ -1,8 +1,6 @@
 """Tests for GDPR endpoints and hashing utilities."""
 from __future__ import annotations
 
-import pytest
-
 
 class TestHashId:
     def test_hash_id_returns_hex_string(self, client):

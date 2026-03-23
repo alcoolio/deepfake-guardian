@@ -1,8 +1,6 @@
 """Tests for the warning/escalation system."""
 from __future__ import annotations
 
-import pytest
-
 
 class TestEscalationAction:
     def test_first_violation_is_notice(self, client):

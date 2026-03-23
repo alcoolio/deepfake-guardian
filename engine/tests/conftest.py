@@ -1,7 +1,6 @@
 """Shared pytest fixtures for the engine test suite."""
 from __future__ import annotations
 
-import asyncio
 import base64
 import io
 import os
@@ -18,8 +17,6 @@ os.environ.setdefault("API_KEY", "")
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./test_guardian.db")
 os.environ.setdefault("GDPR_SALT", "test-salt-for-tests")
 
-# Remove any leftover test database from a previous run so each test session
-# starts with a clean schema.
 _TEST_DB_PATH = "./test_guardian.db"
 if os.path.exists(_TEST_DB_PATH):
     os.remove(_TEST_DB_PATH)
