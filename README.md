@@ -100,7 +100,7 @@ Enable it via `ENABLED_LANGUAGES=en,de,fr` in `engine/.env`.
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/your-org/deepfake-guardian.git
+git clone https://github.com/alcoolio/deepfake-guardian.git
 cd deepfake-guardian
 
 cp engine/.env.example engine/.env
@@ -169,7 +169,7 @@ specific values within the chosen profile.
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `THRESHOLD_VIOLENCE` | `0.7` | Delete threshold for violence |
-| `THRESHOLD_SEXUAL_VIOLENCE` | `0.5` | Delete threshold for sexual violence |
+| `THRESHOLD_SEXUAL_VIOLENCE` | `0.7` | Delete threshold for sexual violence |
 | `THRESHOLD_NSFW` | `0.6` | Delete threshold for NSFW |
 | `THRESHOLD_DEEPFAKE` | `0.8` | Delete threshold for deepfake |
 | `THRESHOLD_CYBERBULLYING` | `0.6` | Delete threshold for cyberbullying |
