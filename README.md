@@ -4,9 +4,9 @@ Open-source content moderation system for **Telegram** and **WhatsApp** group ch
 Protects communities — especially those with minors — from violence, NSFW content,
 sexual violence, cyberbullying, and deepfakes in text, images, and videos.
 
-> **Current state:** Phase 2 complete — i18n architecture, English + German language packs,
-> cyberbullying detection, and threshold profiles are all in place.
-> Deepfake detection and video moderation are still stubs. No GDPR persistence yet.
+> **Current state:** Phase 3 complete — GDPR-compliant audit database, warning/escalation
+> system, `/privacy` and `/delete_my_data` bot commands, and automatic data retention
+> cleanup are all in place. Deepfake detection and video moderation are still stubs.
 > See [ROADMAP.md](ROADMAP.md) for the full development plan.
 
 ---
@@ -261,7 +261,7 @@ cd telegram-bot && pip install -r requirements.txt && pytest
 |-------|-------|--------|
 | 1 | Tests, CI/CD, API auth, resilience | ✅ Done |
 | 2 | i18n architecture, German + English language packs, cyberbullying | ✅ Done |
-| 3 | GDPR compliance, database, warning/escalation system | Planned |
+| 3 | GDPR compliance, database, warning/escalation system | ✅ Done |
 | 4 | Real deepfake detection, video frame extraction | Planned |
 | 5 | Admin dashboard, admin bot commands, educational feedback | Planned |
 | 6 | WhatsApp parity, Signal & Discord bots, community language packs | Planned |
@@ -284,15 +284,63 @@ Use `MODERATION_PROFILE=minors_strict` for groups with minors.
 
 ---
 
-## Security & Privacy
+## GDPR & Privacy
 
-- Message content is **never stored** — only a short preview (80 chars) appears in
-  structured logs for debugging.
-- User IDs are not collected (stateless prototype).
-- Phase 3 introduces GDPR-compliant audit logging: metadata only, hashed user IDs,
-  automatic deletion after 30 days, right-to-erasure endpoint.
-- GDPR compliance for minors is the strictest standard globally and covers COPPA
-  (USA), PIPEDA (Canada), LGPD (Brazil), and similar frameworks.
+### What is stored
+
+| Data | Stored? | Notes |
+|------|---------|-------|
+| Message text / images / video | **Never** | Processed in memory only |
+| Moderation verdict + scores | ✅ (metadata only) | Deleted after `DATA_RETENTION_DAYS` (default 30) |
+| User/group identifiers | ✅ (hashed) | SHA-256 with secret salt — not reversible |
+| Warning counts | ✅ | Deleted on erasure request |
+
+### Engine — GDPR configuration
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `DATABASE_URL` | `sqlite+aiosqlite:///./deepfake_guardian.db` | SQLite (default) or PostgreSQL asyncpg URL |
+| `GDPR_SALT` | *(change me)* | Secret salt for SHA-256 hashing — **set a strong random value in production** |
+| `DATA_RETENTION_DAYS` | `30` | Days before moderation events are auto-deleted |
+
+### User rights (GDPR Articles 15–17)
+
+| Command | Behaviour |
+|---------|-----------|
+| `/privacy` | Shows the full privacy notice in the group |
+| `/delete_my_data` | Submits an Article 17 erasure request; all stored data is deleted within 30 days |
+
+Engine API endpoints for programmatic access:
+
+```
+POST /gdpr/export                  — Article 15: export all data for a user
+POST /gdpr/delete_request          — Article 17: submit erasure request
+GET  /gdpr/delete_request/{id}     — check erasure request status
+```
+
+### Warning / escalation system
+
+```
+POST /warnings/record              — record a violation, returns escalation action
+GET  /warnings/{user_id_hash}      — fetch warning history for a user
+```
+
+Escalation levels per (user, group):
+
+| Violation count | Action |
+|----------------|--------|
+| 1st | `notice` — educational reply in the group |
+| 2nd | `admin_notification` — @-mention group admins |
+| 3rd+ | `supervisor_escalation` — urgent admin mention with incident count |
+
+### Security & Privacy notes
+
+- Message content is **never stored** — only a 80-char preview appears in
+  structured debug logs (never in the database).
+- User IDs are hashed with SHA-256 + secret salt before storage.
+- GDPR compliance for minors is the strictest standard globally and covers
+  COPPA (USA), PIPEDA (Canada), LGPD (Brazil), and similar frameworks.
+- See `engine/privacy_policy.md` for a deployable privacy policy template.
 
 ---
 

@@ -1,8 +1,9 @@
 """Entry-point for the moderation engine API."""
-
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
 
 import structlog
 import uvicorn
@@ -14,7 +15,10 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
 from config import settings
+from database import AsyncSessionLocal, init_db
+from gdpr import gdpr_router, process_pending_deletions, run_retention_cleanup
 from routes import router
+from warn import warnings_router
 
 # ---------------------------------------------------------------------------
 # Logging setup (structlog wrapping stdlib)
@@ -43,18 +47,43 @@ limiter = Limiter(
     default_limits=[settings.rate_limit],
 )
 
+
+# ---------------------------------------------------------------------------
+# Lifespan — database initialisation and GDPR cleanup on startup
+# ---------------------------------------------------------------------------
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Initialise the database and run GDPR housekeeping on startup."""
+    await init_db()
+    async with AsyncSessionLocal() as session:
+        cleaned = await run_retention_cleanup(session)
+        processed = await process_pending_deletions(session)
+        if cleaned or processed:
+            log.info(
+                "startup_gdpr_cleanup",
+                retention_deleted=cleaned,
+                erasure_requests_processed=processed,
+            )
+    yield
+
+
 # ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
 app = FastAPI(
     title="Deepfake Guardian – Moderation Engine",
-    version="0.2.0",
+    version="0.4.0",
     description="Lightweight content moderation API for text, images, and video.",
+    lifespan=lifespan,
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 app.add_middleware(SlowAPIMiddleware)
 app.include_router(router)
+app.include_router(gdpr_router)
+app.include_router(warnings_router)
 
 
 # ---------------------------------------------------------------------------

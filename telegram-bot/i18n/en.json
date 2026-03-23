@@ -2,5 +2,16 @@
   "flagged_content": "⚠️ Flagged content ({reasons}). Admins: {mentions}",
   "flagged_content_no_admins": "⚠️ Flagged content ({reasons}).",
   "cyberbullying_notice": "⚠️ This message may contain cyberbullying ({reasons}). Admins: {mentions}",
-  "cyberbullying_notice_no_admins": "⚠️ This message may contain cyberbullying ({reasons})."
+  "cyberbullying_notice_no_admins": "⚠️ This message may contain cyberbullying ({reasons}).",
+
+  "warning_notice": "⚠️ Your message was removed because it violated community guidelines ({reasons}). Please keep this space safe and respectful. This is your first notice.",
+  "warning_admin_notification": "⚠️ Repeated violation by {mention} ({reasons}). Admins: {admin_mentions}",
+  "warning_admin_notification_no_admins": "⚠️ Repeated violation ({reasons}). This is warning #{count} for this user.",
+  "warning_supervisor_escalation": "🚨 Persistent violations by {mention} ({reasons}) — {count} incidents recorded. Admins: {admin_mentions} — please review and take action.",
+  "warning_supervisor_escalation_no_admins": "🚨 Persistent violations ({reasons}) — {count} incidents recorded. Please review and take action.",
+
+  "privacy_notice": "🔒 *Privacy Notice*\n\nDeepfake Guardian moderates content in this group to protect all members. Here is how your data is handled:\n\n• Messages are analysed for harmful content but *never stored*.\n• Only metadata (verdict, category scores) is logged — no message text.\n• Your user ID is stored as a one-way hash (never in plain text).\n• All data is automatically deleted after 30 days.\n• You can request deletion of your data at any time.\n\nType /delete_my_data to submit an erasure request (GDPR Article 17).",
+  "delete_my_data_submitted": "✅ Your data deletion request has been submitted (request ID: {request_id}). All stored data associated with your account will be erased within 30 days.",
+  "delete_my_data_already_pending": "ℹ️ A deletion request is already pending for your account (request ID: {request_id}). Your data will be erased within 30 days.",
+  "delete_my_data_error": "❌ Could not submit your deletion request. Please try again later or contact an admin."
 }

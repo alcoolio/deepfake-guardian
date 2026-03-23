@@ -159,7 +159,7 @@ be addable without code changes.
 
 ---
 
-## Phase 3: GDPR Compliance & Persistence
+## Phase 3: GDPR Compliance & Persistence ✅
 
 **Goal:** Full GDPR compliance for minor data. Audit logging with automatic deletion schedules.
 
@@ -333,7 +333,7 @@ be addable without code changes.
 |-------|-------|--------|------------|
 | 1 | Tests, CI/CD, API auth, resilience | M | — |
 | 2 | i18n architecture, cyberbullying, DE+EN language packs | L–XL | Phase 1 |
-| 3 | GDPR, database, warning system, consent | XL | Phase 1 |
+| 3 | GDPR, database, warning system, consent | XL | Phase 1 | ✅ |
 | 4 | Real deepfake detection, video analysis | L | Phase 1 |
 | 5 | Dashboard, admin tools, educational feedback | XL | Phase 2+3 |
 | 6 | WhatsApp parity, Signal, Discord, community languages | XL | Phase 5 |
@@ -348,7 +348,7 @@ Phase 2.
 
 - **Phase 1:** `pytest` passes green, CI pipeline green, engine rejects requests without API key
 - **Phase 2:** `engine/i18n/packs/de.py` detects "Du bist so hässlich" as cyberbullying. New language pack = 1 new file. Bot responds in German. `minors_strict` profile active.
-- **Phase 3:** Moderation events visible in DB, `/delete_my_data` command works, auto-deletion after 30 days
+- **Phase 3:** Moderation events visible in DB, `/delete_my_data` command works, auto-deletion after 30 days ✅
 - **Phase 4:** Known deepfake image detected with score >0.7, video frames are extracted
 - **Phase 5:** Dashboard shows statistics, admin can use `/stats` in chat, educational feedback is language-specific
 - **Phase 6:** Signal bot responds, Kubernetes deployment running, `pip install deepfake-guardian-lang-fr` works

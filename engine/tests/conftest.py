@@ -1,7 +1,7 @@
 """Shared pytest fixtures for the engine test suite."""
-
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import os
@@ -11,8 +11,18 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-# Ensure no API_KEY is set during tests by default so auth is disabled
+# ---------------------------------------------------------------------------
+# Environment setup — must happen before any app modules are imported
+# ---------------------------------------------------------------------------
 os.environ.setdefault("API_KEY", "")
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./test_guardian.db")
+os.environ.setdefault("GDPR_SALT", "test-salt-for-tests")
+
+# Remove any leftover test database from a previous run so each test session
+# starts with a clean schema.
+_TEST_DB_PATH = "./test_guardian.db"
+if os.path.exists(_TEST_DB_PATH):
+    os.remove(_TEST_DB_PATH)
 
 # Safe scores returned by the mocked classify_text
 _SAFE_TEXT_SCORES = {
@@ -24,9 +34,19 @@ _SAFE_TEXT_SCORES = {
 }
 
 
+def pytest_sessionfinish(session, exitstatus):  # noqa: ARG001
+    """Clean up the test database file after the test session completes."""
+    if os.path.exists(_TEST_DB_PATH):
+        os.remove(_TEST_DB_PATH)
+
+
 @pytest.fixture()
 def client():
-    """Return a TestClient with ML classifiers mocked out (fast, no GPU needed)."""
+    """Return a TestClient with ML classifiers mocked out (fast, no GPU needed).
+
+    The TestClient starts the FastAPI lifespan which calls ``init_db()``,
+    creating the SQLite test database tables on first use.
+    """
     with (
         patch("classifiers.classify_text", return_value=_SAFE_TEXT_SCORES),
         patch("classifiers._get_image_classifier") as mock_img_clf,

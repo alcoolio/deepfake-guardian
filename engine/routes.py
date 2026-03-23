@@ -1,11 +1,11 @@
 """FastAPI route handlers for the moderation engine."""
-
 from __future__ import annotations
 
 import structlog
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
 from classifiers import classify_image, classify_text, decode_image, detect_deepfake_suspect
+from gdpr import log_moderation_event
 from models import (
     ImageRequest,
     ModerationResult,
@@ -19,8 +19,30 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 
+# ---------------------------------------------------------------------------
+# Helper: build score dict for audit logging
+# ---------------------------------------------------------------------------
+
+
+def _score_dict(scores: ModerationScores) -> dict[str, float]:
+    return {
+        "violence": scores.violence,
+        "sexual_violence": scores.sexual_violence,
+        "nsfw": scores.nsfw,
+        "deepfake_suspect": scores.deepfake_suspect,
+        "cyberbullying": scores.cyberbullying,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
+
 @router.post("/moderate_text", response_model=ModerationResult)
-async def moderate_text(request: Request, req: TextRequest) -> ModerationResult:
+async def moderate_text(
+    request: Request, req: TextRequest, background_tasks: BackgroundTasks
+) -> ModerationResult:
     """Classify plain text and return a moderation verdict."""
     from i18n.detector import detect_language
 
@@ -43,11 +65,27 @@ async def moderate_text(request: Request, req: TextRequest) -> ModerationResult:
         language=lang_code,
         text_preview=req.text[:80],
     )
+
+    if req.user_id or req.group_id:
+        background_tasks.add_task(
+            log_moderation_event,
+            req.platform,
+            req.user_id,
+            req.group_id,
+            "text",
+            result.verdict,
+            result.reasons,
+            _score_dict(scores),
+            lang_code,
+        )
+
     return result
 
 
 @router.post("/moderate_image", response_model=ModerationResult)
-async def moderate_image(request: Request, req: ImageRequest) -> ModerationResult:
+async def moderate_image(
+    request: Request, req: ImageRequest, background_tasks: BackgroundTasks
+) -> ModerationResult:
     """Classify an image and return a moderation verdict."""
     image = decode_image(req.image_base64, req.image_url)
     if image is None:
@@ -69,11 +107,27 @@ async def moderate_image(request: Request, req: ImageRequest) -> ModerationResul
         verdict=result.verdict,
         reasons=result.reasons,
     )
+
+    if req.user_id or req.group_id:
+        background_tasks.add_task(
+            log_moderation_event,
+            req.platform,
+            req.user_id,
+            req.group_id,
+            "image",
+            result.verdict,
+            result.reasons,
+            _score_dict(scores),
+            None,
+        )
+
     return result
 
 
 @router.post("/moderate_video", response_model=ModerationResult)
-async def moderate_video(request: Request, req: VideoRequest) -> ModerationResult:
+async def moderate_video(
+    request: Request, req: VideoRequest, background_tasks: BackgroundTasks
+) -> ModerationResult:
     """Classify a video by sampling frames.
 
     TODO: Implement proper frame extraction (e.g. via OpenCV or decord).
@@ -99,4 +153,18 @@ async def moderate_video(request: Request, req: VideoRequest) -> ModerationResul
         reasons=result.reasons,
         note="stub – frame extraction not yet implemented",
     )
+
+    if req.user_id or req.group_id:
+        background_tasks.add_task(
+            log_moderation_event,
+            req.platform,
+            req.user_id,
+            req.group_id,
+            "video",
+            result.verdict,
+            result.reasons,
+            _score_dict(scores),
+            None,
+        )
+
     return result
