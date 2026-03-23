@@ -212,37 +212,54 @@ be addable without code changes.
 
 ---
 
-## Phase 4: Deepfake Detection & Video Analysis
+## Phase 4: Deepfake Detection & Video Analysis ✅
 
 **Goal:** Replace the deepfake stub with a real model. Implement video frame extraction.
 
-### 4.1 Deepfake Model Integration
+### 4.1 Deepfake Detection Provider System
+- **New files:**
+  - `engine/deepfake/` — provider abstraction package:
+    - `engine/deepfake/base.py` — `DeepfakeDetector` ABC: `detect(face_images) -> list[float]`, `is_available() -> bool`
+    - `engine/deepfake/factory.py` — factory with cached singleton: reads `DEEPFAKE_PROVIDER` env var, falls back to stub
+    - `engine/deepfake/face_extractor.py` — shared face extraction using MediaPipe `FaceDetection`
+    - `engine/deepfake/local_detector.py` — `LocalOnnxDetector`: EfficientNet-B0 ONNX model (~20 MB, CPU)
+    - `engine/deepfake/cloud_sightengine.py` — `SightEngineDetector`: SightEngine cloud API
+    - `engine/deepfake/cloud_generic.py` — `GenericApiDetector`: user-configured HTTP endpoint
 - **Modified files:**
-  - `engine/classifiers.py` — replace `detect_deepfake_suspect()`:
-    - Model: EfficientNet-B0 fine-tuned on FaceForensics++ (ONNX format, ~20 MB, CPU-compatible)
-    - Preprocessing: face detection via `mediapipe` or `retinaface` (lightweight)
-    - Pipeline: image → extract faces → deepfake score per face → aggregation
-  - `engine/requirements.txt` — add onnxruntime, mediapipe
+  - `engine/classifiers.py` — `detect_deepfake_suspect()` rewired: extract faces → run provider → return max score
+  - `engine/config.py` — new settings: `DEEPFAKE_PROVIDER`, `DEEPFAKE_MODEL_PATH`, cloud credentials, video processing params
+  - `engine/requirements.txt` — added `onnxruntime`, `mediapipe`
 
 ### 4.2 Video Frame Extraction
 - **New files:**
-  - `engine/video_processing.py` — frame extraction:
-    - OpenCV-based: extract key frames every N seconds
-    - Scene detection: frames at scene changes
-    - Max frame limit (e.g. 10 frames per video) for performance
-    - Aggregation: highest score across all frames
+  - `engine/video_processing.py` — OpenCV-based frame extraction:
+    - Samples 1 frame every `FRAME_INTERVAL` seconds (default 2.0)
+    - Capped at `MAX_FRAMES` (default 10), rejects videos > `MAX_VIDEO_DURATION` (default 300s)
+    - Aggregation: max score across all frames per category
 - **Modified files:**
-  - `engine/routes.py` — `/moderate_video` with real frame processing
-  - `engine/requirements.txt` — add opencv-python-headless
-  - `engine/Dockerfile` — install ffmpeg
+  - `engine/routes.py` — `/moderate_video` replaced: decode → extract frames → classify + deepfake → aggregate → verdict
+  - `engine/requirements.txt` — added `opencv-python-headless`
+  - `engine/Dockerfile` — added `ffmpeg`
+  - `docker-compose.yml` — added `onnx-models` volume
 
 ### 4.3 Image Violence Detection
 - **Modified files:**
-  - `engine/classifiers.py` — extend `classify_image()`:
-    - Additional model for violence detection in images
-    - Currently `violence` always returns `0.0` — fix this
+  - `engine/classifiers.py` — `classify_image()` extended with CLIP zero-shot violence classifier
+    (`openai/clip-vit-base-patch32` with violence/gore/fighting labels); `violence` score no longer hardcoded `0.0`
 
-**Effort:** L | **Result:** Real deepfake detection + working video moderation
+### 4.4 Tests
+- **New files:**
+  - `engine/tests/test_deepfake_factory.py` — factory provider selection, fallback, caching
+  - `engine/tests/test_face_extractor.py` — face detection with mocked MediaPipe
+  - `engine/tests/test_local_detector.py` — ONNX preprocessing, sigmoid, session mocking
+  - `engine/tests/test_cloud_detector.py` — SightEngine + generic API mocked calls
+  - `engine/tests/test_video_processing.py` — frame extraction, score aggregation
+- **Modified files:**
+  - `engine/tests/conftest.py` — mocks for deepfake factory and face extractor
+  - `engine/tests/test_classifiers.py` — updated deepfake and violence tests
+  - `engine/tests/test_routes.py` — updated video moderation tests
+
+**Effort:** L | **Result:** Real deepfake detection + working video moderation + image violence detection
 
 ---
 
@@ -334,7 +351,7 @@ be addable without code changes.
 | 1 | Tests, CI/CD, API auth, resilience | M | — |
 | 2 | i18n architecture, cyberbullying, DE+EN language packs | L–XL | Phase 1 |
 | 3 | GDPR, database, warning system, consent | XL | Phase 1 | ✅ |
-| 4 | Real deepfake detection, video analysis | L | Phase 1 |
+| 4 | Real deepfake detection, video analysis | L | Phase 1 | ✅ |
 | 5 | Dashboard, admin tools, educational feedback | XL | Phase 2+3 |
 | 6 | WhatsApp parity, Signal, Discord, community languages | XL | Phase 5 |
 
@@ -349,7 +366,7 @@ Phase 2.
 - **Phase 1:** `pytest` passes green, CI pipeline green, engine rejects requests without API key
 - **Phase 2:** `engine/i18n/packs/de.py` detects "Du bist so hässlich" as cyberbullying. New language pack = 1 new file. Bot responds in German. `minors_strict` profile active.
 - **Phase 3:** Moderation events visible in DB, `/delete_my_data` command works, auto-deletion after 30 days ✅
-- **Phase 4:** Known deepfake image detected with score >0.7, video frames are extracted
+- **Phase 4:** Known deepfake image detected with score >0.7, video frames are extracted ✅
 - **Phase 5:** Dashboard shows statistics, admin can use `/stats` in chat, educational feedback is language-specific
 - **Phase 6:** Signal bot responds, Kubernetes deployment running, `pip install deepfake-guardian-lang-fr` works
 

@@ -59,6 +59,22 @@ class Settings:
             os.getenv("THRESHOLD_CYBERBULLYING", str(profile.cyberbullying))
         )
 
+        # Deepfake detection provider: local | sightengine | api | stub
+        self.deepfake_provider: str = os.getenv("DEEPFAKE_PROVIDER", "local")
+        self.deepfake_model_path: str = os.getenv("DEEPFAKE_MODEL_PATH", "")
+
+        # Cloud credentials (only needed for cloud providers)
+        self.sightengine_api_user: str = os.getenv("SIGHTENGINE_API_USER", "")
+        self.sightengine_api_secret: str = os.getenv("SIGHTENGINE_API_SECRET", "")
+        self.deepfake_api_url: str = os.getenv("DEEPFAKE_API_URL", "")
+        self.deepfake_api_key: str = os.getenv("DEEPFAKE_API_KEY", "")
+        self.deepfake_api_score_path: str = os.getenv("DEEPFAKE_API_SCORE_PATH", "score")
+
+        # Video processing
+        self.frame_interval: float = float(os.getenv("FRAME_INTERVAL", "2.0"))
+        self.max_frames: int = int(os.getenv("MAX_FRAMES", "10"))
+        self.max_video_duration: int = int(os.getenv("MAX_VIDEO_DURATION", "300"))
+
         # GDPR / persistence
         self.database_url: str = os.getenv(
             "DATABASE_URL", "sqlite+aiosqlite:///./deepfake_guardian.db"

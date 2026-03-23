@@ -44,9 +44,14 @@ def client():
     The TestClient starts the FastAPI lifespan which calls ``init_db()``,
     creating the SQLite test database tables on first use.
     """
+    from deepfake.factory import StubDetector
+
     with (
         patch("classifiers.classify_text", return_value=_SAFE_TEXT_SCORES),
         patch("classifiers._get_image_classifier") as mock_img_clf,
+        patch("classifiers._get_violence_classifier", return_value=None),
+        patch("deepfake.face_extractor._get_face_detector", return_value=None),
+        patch("deepfake.factory.get_detector", return_value=StubDetector()),
     ):
         # Image classifier returns safe NSFW score
         mock_img_clf.return_value = MagicMock(
@@ -64,9 +69,14 @@ def client_with_key(monkeypatch):
     """Return a TestClient with API_KEY authentication enabled."""
     monkeypatch.setenv("API_KEY", "test-secret-key")
 
+    from deepfake.factory import StubDetector
+
     with (
         patch("classifiers.classify_text", return_value=_SAFE_TEXT_SCORES),
         patch("classifiers._get_image_classifier") as mock_img_clf,
+        patch("classifiers._get_violence_classifier", return_value=None),
+        patch("deepfake.face_extractor._get_face_detector", return_value=None),
+        patch("deepfake.factory.get_detector", return_value=StubDetector()),
     ):
         mock_img_clf.return_value = MagicMock(
             return_value=[{"label": "normal", "score": 0.98}, {"label": "nsfw", "score": 0.02}]

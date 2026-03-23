@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
+from PIL import Image
 
 
 class TestHealth:
@@ -60,18 +63,40 @@ class TestModerateImage:
     def test_response_has_deepfake_score(self, client, small_image_b64):
         resp = client.post("/moderate_image", json={"image_base64": small_image_b64})
         assert resp.status_code == 200
-        # Deepfake stub always returns 0.05
+        # No faces in a 10x10 red image → baseline score 0.05
         assert resp.json()["scores"]["deepfake_suspect"] == pytest.approx(0.05)
 
 
 class TestModerateVideo:
-    def test_stub_returns_allow(self, client):
-        resp = client.post("/moderate_video", json={"video_base64": "dGVzdA=="})
+    def test_video_with_no_frames_returns_allow(self, client):
+        """When frame extraction yields no frames, returns allow."""
+        with (
+            patch("video_processing.extract_frames", return_value=[]),
+        ):
+            resp = client.post("/moderate_video", json={"video_base64": "dGVzdA=="})
         assert resp.status_code == 200
         body = resp.json()
-        # Video is still a stub — always allow
         assert body["verdict"] == "allow"
         assert body["scores"]["violence"] == 0.0
+
+    def test_video_with_frames_returns_aggregated_scores(self, client, small_image_b64):
+        """When frames are extracted, scores are aggregated from frame analysis."""
+        fake_frame = Image.new("RGB", (10, 10), color=(0, 0, 0))
+        mock_scores = {
+            "violence": 0.1,
+            "sexual_violence": 0.05,
+            "nsfw": 0.02,
+            "deepfake_suspect": 0.05,
+        }
+        with (
+            patch("video_processing.extract_frames", return_value=[fake_frame]),
+            patch("video_processing.moderate_video_frames", return_value=mock_scores),
+        ):
+            resp = client.post("/moderate_video", json={"video_base64": "dGVzdA=="})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["verdict"] == "allow"
+        assert body["scores"]["violence"] == pytest.approx(0.1)
 
     def test_missing_video_fields_rejected(self, client):
         resp = client.post("/moderate_video", json={})

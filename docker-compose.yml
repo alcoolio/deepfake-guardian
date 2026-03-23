@@ -9,6 +9,7 @@ services:
       - ./engine/.env
     volumes:
       - hf-cache:/root/.cache/huggingface
+      - onnx-models:/root/.cache/deepfake_guardian
       - engine-db:/app/data
     environment:
       - DATABASE_URL=sqlite+aiosqlite:////app/data/deepfake_guardian.db
@@ -46,5 +47,6 @@ networks:
 
 volumes:
   hf-cache:
+  onnx-models:
   wa-session:
   engine-db:
