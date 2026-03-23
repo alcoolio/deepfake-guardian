@@ -118,7 +118,7 @@ brew install ffmpeg
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/your-org/deepfake-guardian.git
+git clone https://github.com/alcoolio/deepfake-guardian.git
 cd deepfake-guardian
 
 cp engine/.env.example engine/.env
@@ -179,18 +179,24 @@ specific values within the chosen profile.
 | Profile | Violence | Sexual violence | NSFW | Deepfake | Cyberbullying |
 |---------|----------|-----------------|------|----------|---------------|
 | `minors_strict` | 0.5 | 0.3 | 0.4 | 0.6 | 0.4 |
-| `default` | 0.7 | 0.5 | 0.6 | 0.8 | 0.6 |
+| `default` | 0.5 | 0.5 | 0.8 | 0.7 | 0.65 |
 | `permissive` | 0.85 | 0.7 | 0.75 | 0.9 | 0.8 |
 
 ### Engine — individual thresholds (0–1 scale)
 
-| Variable | Default | Meaning |
+> **How thresholds work:** each threshold is the minimum confidence score that
+> triggers an automatic deletion. A **lower value means higher priority** — the
+> engine deletes at lower model confidence, so the category is caught earlier and
+> more aggressively. A higher value means the model must be very confident before
+> acting, reducing false positives for noisier categories.
+
+| Variable | Default | Priority |
 |----------|---------|---------|
-| `THRESHOLD_VIOLENCE` | `0.7` | Delete threshold for violence |
-| `THRESHOLD_SEXUAL_VIOLENCE` | `0.5` | Delete threshold for sexual violence |
-| `THRESHOLD_NSFW` | `0.6` | Delete threshold for NSFW |
-| `THRESHOLD_DEEPFAKE` | `0.8` | Delete threshold for deepfake |
-| `THRESHOLD_CYBERBULLYING` | `0.6` | Delete threshold for cyberbullying |
+| `THRESHOLD_VIOLENCE` | `0.5` | Highest — deleted at low confidence |
+| `THRESHOLD_SEXUAL_VIOLENCE` | `0.5` | Highest — same as violence |
+| `THRESHOLD_CYBERBULLYING` | `0.65` | High |
+| `THRESHOLD_DEEPFAKE` | `0.7` | Medium |
+| `THRESHOLD_NSFW` | `0.8` | Lower — only deleted at high confidence |
 
 Messages with any score **≥ 0.4** but below the delete threshold are **flagged** for
 admin review instead of being deleted.

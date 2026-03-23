@@ -82,10 +82,11 @@ GET  /health          (health check)
 
 **Default thresholds** (all overridable via env):
 ```
-THRESHOLD_VIOLENCE        = 0.7
+THRESHOLD_VIOLENCE        = 0.5
 THRESHOLD_SEXUAL_VIOLENCE = 0.5
-THRESHOLD_NSFW            = 0.6
-THRESHOLD_DEEPFAKE        = 0.8
+THRESHOLD_NSFW            = 0.8
+THRESHOLD_DEEPFAKE        = 0.7
+THRESHOLD_CYBERBULLYING   = 0.65
 ```
 
 ### `telegram-bot/`
@@ -192,16 +193,11 @@ curl -X POST http://localhost:8000/moderate_text \
 | `HOST` | `0.0.0.0` | Bind address |
 | `PORT` | `8000` | Listen port |
 | `LOG_LEVEL` | `info` | Logging verbosity |
-| `THRESHOLD_VIOLENCE` | `0.7` | Delete threshold for violence (0–1) |
+| `THRESHOLD_VIOLENCE` | `0.5` | Delete threshold for violence (0–1) |
 | `THRESHOLD_SEXUAL_VIOLENCE` | `0.5` | Delete threshold for sexual violence |
-| `THRESHOLD_NSFW` | `0.6` | Delete threshold for NSFW |
-| `THRESHOLD_DEEPFAKE` | `0.8` | Delete threshold for deepfake |
-| `DEEPFAKE_PROVIDER` | `stub` | Deepfake provider: `openai`, `ollama`, `local`, `sightengine`, `api`, `stub` |
-| `OPENAI_API_KEY` | — | OpenAI API key (for `openai` provider) |
-| `OPENAI_MODEL` | `gpt-4o` | OpenAI vision model to use |
-| `OPENAI_API_BASE` | `https://api.openai.com/v1` | OpenAI-compatible API base URL |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL (for `ollama` provider) |
-| `OLLAMA_MODEL` | `llava` | Ollama vision model to use |
+| `THRESHOLD_NSFW` | `0.8` | Delete threshold for NSFW |
+| `THRESHOLD_DEEPFAKE` | `0.7` | Delete threshold for deepfake |
+| `THRESHOLD_CYBERBULLYING` | `0.65` | Delete threshold for cyberbullying |
 
 ### Telegram bot (`telegram-bot/.env`)
 

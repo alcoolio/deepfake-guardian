@@ -38,11 +38,11 @@ PROFILES: dict[str, ThresholdProfile] = {
         cyberbullying=0.4,
     ),
     "default": ThresholdProfile(
-        violence=0.6,
-        sexual_violence=0.6,
-        nsfw=0.6,
-        deepfake=0.8,
-        cyberbullying=0.6,
+        violence=0.5,
+        sexual_violence=0.5,
+        nsfw=0.8,
+        deepfake=0.7,
+        cyberbullying=0.65,
     ),
     "permissive": ThresholdProfile(
         violence=0.85,
