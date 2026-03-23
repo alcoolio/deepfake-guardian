@@ -115,7 +115,7 @@ Lives in `src/`. See its own `README.md` for setup details.
 
 | Area | Status |
 |------|--------|
-| Deepfake detection | ✅ Provider-based: `local` (ONNX), `sightengine`, `api`, `stub`. See `engine/deepfake/` |
+| Deepfake detection | ✅ Provider-based: `openai`, `ollama`, `local` (ONNX), `sightengine`, `api`, `stub`. Default: `stub` — set a provider + API key to enable. See `engine/deepfake/` |
 | Video moderation | ✅ OpenCV frame extraction + per-frame analysis. See `engine/video_processing.py` |
 | Image violence score | ✅ CLIP zero-shot classifier. See `engine/classifiers.py:_get_violence_classifier()` |
 | Tests | ✅ pytest suite with mocked ML models |
@@ -196,6 +196,12 @@ curl -X POST http://localhost:8000/moderate_text \
 | `THRESHOLD_SEXUAL_VIOLENCE` | `0.5` | Delete threshold for sexual violence |
 | `THRESHOLD_NSFW` | `0.6` | Delete threshold for NSFW |
 | `THRESHOLD_DEEPFAKE` | `0.8` | Delete threshold for deepfake |
+| `DEEPFAKE_PROVIDER` | `stub` | Deepfake provider: `openai`, `ollama`, `local`, `sightengine`, `api`, `stub` |
+| `OPENAI_API_KEY` | — | OpenAI API key (for `openai` provider) |
+| `OPENAI_MODEL` | `gpt-4o` | OpenAI vision model to use |
+| `OPENAI_API_BASE` | `https://api.openai.com/v1` | OpenAI-compatible API base URL |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL (for `ollama` provider) |
+| `OLLAMA_MODEL` | `llava` | Ollama vision model to use |
 
 ### Telegram bot (`telegram-bot/.env`)
 
