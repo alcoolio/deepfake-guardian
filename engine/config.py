@@ -59,9 +59,18 @@ class Settings:
             os.getenv("THRESHOLD_CYBERBULLYING", str(profile.cyberbullying))
         )
 
-        # Deepfake detection provider: local | sightengine | api | stub
-        self.deepfake_provider: str = os.getenv("DEEPFAKE_PROVIDER", "local")
+        # Deepfake detection provider: openai | ollama | local | sightengine | api | stub
+        self.deepfake_provider: str = os.getenv("DEEPFAKE_PROVIDER", "stub")
         self.deepfake_model_path: str = os.getenv("DEEPFAKE_MODEL_PATH", "")
+
+        # OpenAI provider (DEEPFAKE_PROVIDER=openai)
+        self.openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+        self.openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o")
+        self.openai_api_base: str = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
+
+        # Ollama provider (DEEPFAKE_PROVIDER=ollama)
+        self.ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        self.ollama_model: str = os.getenv("OLLAMA_MODEL", "llava")
 
         # Cloud credentials (only needed for cloud providers)
         self.sightengine_api_user: str = os.getenv("SIGHTENGINE_API_USER", "")

@@ -43,6 +43,44 @@ class TestFactory:
             det = get_detector()
         assert isinstance(det, StubDetector)
 
+    def test_openai_provider_without_key_falls_back_to_stub(self):
+        with patch("config.settings") as mock_settings:
+            mock_settings.deepfake_provider = "openai"
+            mock_settings.openai_api_key = ""
+            mock_settings.openai_model = "gpt-4o"
+            mock_settings.openai_api_base = "https://api.openai.com/v1"
+            det = get_detector()
+        assert isinstance(det, StubDetector)
+
+    def test_ollama_provider_without_url_falls_back_to_stub(self):
+        with patch("config.settings") as mock_settings:
+            mock_settings.deepfake_provider = "ollama"
+            mock_settings.ollama_base_url = ""
+            mock_settings.ollama_model = "llava"
+            det = get_detector()
+        assert isinstance(det, StubDetector)
+
+    def test_openai_provider_with_key(self):
+        from deepfake.cloud_openai import OpenAIDetector
+
+        with patch("config.settings") as mock_settings:
+            mock_settings.deepfake_provider = "openai"
+            mock_settings.openai_api_key = "sk-test"
+            mock_settings.openai_model = "gpt-4o"
+            mock_settings.openai_api_base = "https://api.openai.com/v1"
+            det = get_detector()
+        assert isinstance(det, OpenAIDetector)
+
+    def test_ollama_provider_with_url(self):
+        from deepfake.cloud_ollama import OllamaDetector
+
+        with patch("config.settings") as mock_settings:
+            mock_settings.deepfake_provider = "ollama"
+            mock_settings.ollama_base_url = "http://localhost:11434"
+            mock_settings.ollama_model = "llava"
+            det = get_detector()
+        assert isinstance(det, OllamaDetector)
+
     def test_unavailable_provider_falls_back_to_stub(self):
         """When is_available() returns False, factory falls back to stub."""
         with patch("config.settings") as mock_settings:

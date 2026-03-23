@@ -38,10 +38,18 @@ def get_detector() -> DeepfakeDetector:
 
     provider = getattr(settings, "deepfake_provider", "stub")
 
-    if provider == "local":
+    if provider == "openai":
+        from deepfake.cloud_openai import OpenAIDetector
+
+        det: DeepfakeDetector = OpenAIDetector()
+    elif provider == "ollama":
+        from deepfake.cloud_ollama import OllamaDetector
+
+        det = OllamaDetector()
+    elif provider == "local":
         from deepfake.local_detector import LocalOnnxDetector
 
-        det: DeepfakeDetector = LocalOnnxDetector()
+        det = LocalOnnxDetector()
     elif provider == "sightengine":
         from deepfake.cloud_sightengine import SightEngineDetector
 

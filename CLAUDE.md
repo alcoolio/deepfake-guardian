@@ -116,7 +116,7 @@ Lives in `src/`. See its own `README.md` for setup details.
 
 | Area | Status |
 |------|--------|
-| Deepfake detection | ✅ Provider-based: `local` (ONNX), `sightengine`, `api`, `stub`. See `engine/deepfake/` |
+| Deepfake detection | ✅ Provider-based: `openai`, `ollama`, `local` (ONNX), `sightengine`, `api`, `stub`. Default: `stub` — set a provider + API key to enable. See `engine/deepfake/` |
 | Video moderation | ✅ OpenCV frame extraction + per-frame analysis. See `engine/video_processing.py` |
 | Image violence score | ✅ CLIP zero-shot classifier. See `engine/classifiers.py:_get_violence_classifier()` |
 | Tests | ✅ pytest suite with mocked ML models |
