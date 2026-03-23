@@ -178,9 +178,9 @@ specific values within the chosen profile.
 
 | Profile | Violence | Sexual violence | NSFW | Deepfake | Cyberbullying |
 |---------|----------|-----------------|------|----------|---------------|
-| `minors_strict` | 0.5 | 0.3 | 0.4 | 0.6 | 0.4 |
-| `default` | 0.7 | 0.5 | 0.6 | 0.8 | 0.6 |
-| `permissive` | 0.85 | 0.7 | 0.75 | 0.9 | 0.8 |
+| `minors_strict` | 0.5 | 0.5 | 0.4 | 0.6 | 0.4 |
+| `default` | 0.7 | 0.7 | 0.5 | 0.6 | 0.6 |
+| `permissive` | 0.8 | 0.8 | 0.5 | 0.9 | 0.8 |
 
 ### Engine — individual thresholds (0–1 scale)
 
