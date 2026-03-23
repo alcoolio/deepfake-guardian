@@ -15,16 +15,26 @@ class TextRequest(BaseModel):
     language: str | None = Field(
         None, description="Optional language hint (ISO 639-1, e.g. 'en', 'de')"
     )
+    # Optional audit context — hashed by the engine before storage (never persisted raw)
+    user_id: str | None = Field(None, description="Platform user ID for audit logging")
+    group_id: str | None = Field(None, description="Platform group/chat ID for audit logging")
+    platform: str = Field("unknown", description="Platform identifier (e.g. 'telegram')")
 
 
 class ImageRequest(BaseModel):
     image_base64: str | None = Field(None, description="Base64-encoded image data")
     image_url: str | None = Field(None, description="Public URL of the image")
+    user_id: str | None = Field(None, description="Platform user ID for audit logging")
+    group_id: str | None = Field(None, description="Platform group/chat ID for audit logging")
+    platform: str = Field("unknown", description="Platform identifier (e.g. 'telegram')")
 
 
 class VideoRequest(BaseModel):
     video_base64: str | None = Field(None, description="Base64-encoded video data")
     video_url: str | None = Field(None, description="Public URL of the video")
+    user_id: str | None = Field(None, description="Platform user ID for audit logging")
+    group_id: str | None = Field(None, description="Platform group/chat ID for audit logging")
+    platform: str = Field("unknown", description="Platform identifier (e.g. 'telegram')")
 
 
 # ---------------------------------------------------------------------------

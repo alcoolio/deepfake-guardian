@@ -28,6 +28,94 @@ and [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 
 ---
 
+## [0.4.0] — 2026-03-23 — Phase 3: GDPR Compliance, Database & Warning System
+
+### Added
+
+**Engine — Database:**
+- `engine/database.py` — async SQLAlchemy engine (`aiosqlite` for SQLite default,
+  `asyncpg` for PostgreSQL).  `init_db()` creates tables on startup (idempotent).
+  `get_session()` FastAPI dependency yields a scoped async session.
+- `engine/db_models.py` — four ORM models:
+  - `ModerationEvent` — audit log per moderation decision: verdict, scores, hashed
+    user/group IDs, content type, language, expiry timestamp.  No message content.
+  - `UserWarning` — running violation counter per (user, group) pair with escalation level.
+  - `ConsentRecord` — tracks whether a user has been shown the privacy notice.
+  - `DeletionRequest` — Article 17 erasure requests (pending → completed lifecycle).
+
+**Engine — GDPR Service (`engine/gdpr.py`):**
+- `hash_id(platform, raw_id)` — SHA-256(GDPR_SALT + platform + id): pseudonymises
+  user/group identifiers before storage; brute-force resistant with the secret salt.
+- `run_retention_cleanup(session)` — deletes ModerationEvents past their `expires_at`
+  timestamp (Article 5(1)(e) storage limitation).
+- `process_pending_deletions(session)` — executes all pending Article 17 requests by
+  erasing ModerationEvents, UserWarnings, and ConsentRecords for the requester.
+- `log_moderation_event(...)` — background-task helper called from routes; failures
+  are swallowed so DB errors never block moderation responses.
+- `POST /gdpr/export` — Article 15 Right of Access: returns all stored data for a user.
+- `POST /gdpr/delete_request` — Article 17 Right to Erasure: submit erasure request.
+- `GET /gdpr/delete_request/{id}` — check erasure request status.
+
+**Engine — Warning & Escalation System (`engine/warn.py`):**
+- `escalation_action(count)` — maps violation count to action:
+  `1 → notice`, `2 → admin_notification`, `≥3 → supervisor_escalation`.
+- `POST /warnings/record` — record a violation for a (user, group) pair; returns
+  updated count and escalation action.
+- `GET /warnings/{user_id_hash}` — fetch all warning records for a user.
+
+**Engine — Tests:**
+- `engine/tests/test_gdpr.py` — 11 tests: hash determinism, export empty/populated,
+  delete request submission, deduplication, status check, 404 on unknown request.
+- `engine/tests/test_warnings.py` — 10 tests: escalation logic, sequential violations,
+  group independence, hash determinism, unknown user returns empty list.
+
+**Telegram Bot — GDPR commands:**
+- `/privacy` — sends the privacy notice in the configured bot language.
+- `/delete_my_data` — submits an Article 17 erasure request via the engine API;
+  confirms submission with the request ID.
+- `engine_client.gdpr_delete_request(user_id)` — calls `POST /gdpr/delete_request`.
+- `engine_client.gdpr_export(user_id)` — calls `POST /gdpr/export`.
+- `engine_client.record_warning(user_id, group_id, reasons)` — calls `POST /warnings/record`.
+
+**Telegram Bot — Warning integration:**
+- `_handle_warning()` in `telegram-bot/main.py` — called after every `delete` or
+  `flag` verdict; records the violation and posts the appropriate escalation message:
+  notice (first offence), admin notification (second), supervisor escalation (third+).
+- Moderation calls now forward `user_id` and `group_id` to the engine for audit logging.
+
+**i18n:**
+- `telegram-bot/i18n/en.json` + `de.json` — nine new message keys:
+  `warning_notice`, `warning_admin_notification`, `warning_admin_notification_no_admins`,
+  `warning_supervisor_escalation`, `warning_supervisor_escalation_no_admins`,
+  `privacy_notice`, `delete_my_data_submitted`, `delete_my_data_already_pending`,
+  `delete_my_data_error`.
+
+**Privacy policy template:**
+- `engine/privacy_policy.md` — deployable GDPR privacy policy template covering
+  data categories, legal basis, pseudonymisation, retention, and user rights.
+
+### Changed
+- `engine/config.py` — three new settings: `database_url` (SQLite default),
+  `gdpr_salt` (SHA-256 salt), `data_retention_days` (default 30).
+- `engine/models.py` — `TextRequest`, `ImageRequest`, `VideoRequest` gain optional
+  `user_id`, `group_id`, `platform` fields for audit context (backward compatible).
+- `engine/routes.py` — all three moderation handlers accept `BackgroundTasks` and
+  schedule `log_moderation_event()` when user/group context is provided.
+- `engine/main.py` — FastAPI lifespan added: runs `init_db()`, `run_retention_cleanup()`,
+  and `process_pending_deletions()` on startup; mounts `gdpr_router` and `warnings_router`.
+  Version bumped to `0.4.0`.
+- `engine/requirements.txt` — added `sqlalchemy==2.0.36`, `aiosqlite==0.20.0`.
+- `engine/.env.example` — added `DATABASE_URL`, `GDPR_SALT`, `DATA_RETENTION_DAYS`.
+- `engine/tests/conftest.py` — sets `DATABASE_URL` and `GDPR_SALT` env vars for tests;
+  cleans up test DB file before and after the test session.
+- `docker-compose.yml` — `engine` service gains `engine-db` volume mounted at
+  `/app/data`; `DATABASE_URL` overridden to point inside the volume.
+- `README.md` — new GDPR & Privacy section with config table, user rights table,
+  warning escalation table, and API endpoint reference.
+- `ROADMAP.md` — Phase 3 marked ✅ complete.
+
+---
+
 ## [0.3.0] — 2026-03-22 — Phase 2: i18n Architecture, Cyberbullying & Language Packs
 
 ### Added

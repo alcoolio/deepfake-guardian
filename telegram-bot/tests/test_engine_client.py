@@ -43,7 +43,9 @@ class TestModerateText:
             result = await engine_client.moderate_text("hello")
 
         assert result["verdict"] == "allow"
-        mock_client.post.assert_called_once_with("/moderate_text", json={"text": "hello"})
+        mock_client.post.assert_called_once_with(
+            "/moderate_text", json={"text": "hello", "platform": "telegram"}
+        )
 
     @pytest.mark.asyncio
     async def test_retries_on_transport_error(self):

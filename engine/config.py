@@ -59,5 +59,14 @@ class Settings:
             os.getenv("THRESHOLD_CYBERBULLYING", str(profile.cyberbullying))
         )
 
+        # GDPR / persistence
+        self.database_url: str = os.getenv(
+            "DATABASE_URL", "sqlite+aiosqlite:///./deepfake_guardian.db"
+        )
+        # Secret salt for SHA-256 ID hashing — change in production
+        self.gdpr_salt: str = os.getenv("GDPR_SALT", "change-me-in-production")
+        # How many days moderation events are kept before automatic deletion
+        self.data_retention_days: int = int(os.getenv("DATA_RETENTION_DAYS", "30"))
+
 
 settings = Settings()

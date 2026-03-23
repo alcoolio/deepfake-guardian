@@ -9,6 +9,9 @@ services:
       - ./engine/.env
     volumes:
       - hf-cache:/root/.cache/huggingface
+      - engine-db:/app/data
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/deepfake_guardian.db
     networks:
       - moderation
     restart: unless-stopped
@@ -44,3 +47,4 @@ networks:
 volumes:
   hf-cache:
   wa-session:
+  engine-db:

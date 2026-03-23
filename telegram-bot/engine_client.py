@@ -3,7 +3,6 @@
 Includes exponential-backoff retry on transient network errors and 5xx responses
 so the bot degrades gracefully when the engine is temporarily unavailable.
 """
-
 from __future__ import annotations
 
 import base64
@@ -84,21 +83,89 @@ async def _post_with_retry(path: str, payload: dict[str, Any]) -> dict[str, Any]
 
 
 # ---------------------------------------------------------------------------
-# Public API
+# Public API — moderation
 # ---------------------------------------------------------------------------
 
-async def moderate_text(text: str) -> dict[str, Any]:
+async def moderate_text(
+    text: str,
+    user_id: str | None = None,
+    group_id: str | None = None,
+) -> dict[str, Any]:
     """Send text to the engine for moderation."""
-    return await _post_with_retry("/moderate_text", {"text": text})
+    payload: dict[str, Any] = {"text": text, "platform": "telegram"}
+    if user_id:
+        payload["user_id"] = user_id
+    if group_id:
+        payload["group_id"] = group_id
+    return await _post_with_retry("/moderate_text", payload)
 
 
-async def moderate_image(image_bytes: bytes) -> dict[str, Any]:
+async def moderate_image(
+    image_bytes: bytes,
+    user_id: str | None = None,
+    group_id: str | None = None,
+) -> dict[str, Any]:
     """Send a base64-encoded image to the engine for moderation."""
     b64 = base64.b64encode(image_bytes).decode()
-    return await _post_with_retry("/moderate_image", {"image_base64": b64})
+    payload: dict[str, Any] = {"image_base64": b64, "platform": "telegram"}
+    if user_id:
+        payload["user_id"] = user_id
+    if group_id:
+        payload["group_id"] = group_id
+    return await _post_with_retry("/moderate_image", payload)
 
 
-async def moderate_video(video_bytes: bytes) -> dict[str, Any]:
+async def moderate_video(
+    video_bytes: bytes,
+    user_id: str | None = None,
+    group_id: str | None = None,
+) -> dict[str, Any]:
     """Send a base64-encoded video to the engine for moderation."""
     b64 = base64.b64encode(video_bytes).decode()
-    return await _post_with_retry("/moderate_video", {"video_base64": b64})
+    payload: dict[str, Any] = {"video_base64": b64, "platform": "telegram"}
+    if user_id:
+        payload["user_id"] = user_id
+    if group_id:
+        payload["group_id"] = group_id
+    return await _post_with_retry("/moderate_video", payload)
+
+
+# ---------------------------------------------------------------------------
+# Public API — GDPR
+# ---------------------------------------------------------------------------
+
+async def gdpr_delete_request(user_id: str) -> dict[str, Any]:
+    """Submit an Article 17 erasure request for a Telegram user."""
+    return await _post_with_retry(
+        "/gdpr/delete_request",
+        {"user_id": user_id, "platform": "telegram", "notes": "requested via /delete_my_data"},
+    )
+
+
+async def gdpr_export(user_id: str) -> dict[str, Any]:
+    """Fetch all stored data for a Telegram user (Article 15)."""
+    return await _post_with_retry(
+        "/gdpr/export",
+        {"user_id": user_id, "platform": "telegram"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Public API — warnings
+# ---------------------------------------------------------------------------
+
+async def record_warning(
+    user_id: str,
+    group_id: str,
+    reasons: list[str],
+) -> dict[str, Any]:
+    """Record a violation for a user in a group; returns the escalation action."""
+    return await _post_with_retry(
+        "/warnings/record",
+        {
+            "user_id": user_id,
+            "group_id": group_id,
+            "platform": "telegram",
+            "reasons": reasons,
+        },
+    )
