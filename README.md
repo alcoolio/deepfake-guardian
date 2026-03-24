@@ -1,148 +1,80 @@
 # Deepfake Guardian
 
-Open-source content moderation system for **Telegram** and **WhatsApp** group chats.
-Protects communities — especially those with minors — from violence, NSFW content,
-sexual violence, cyberbullying, and deepfakes in text, images, and videos.
+**Open-source content moderation for group chats.** Protects communities — especially those with minors — from violence, NSFW content, sexual violence, cyberbullying, and deepfakes.
 
-> **Current state:** Phase 4 complete — real deepfake detection with pluggable providers
-> (local ONNX, SightEngine, generic API), video frame extraction, and image violence
-> detection are all in place on top of GDPR-compliant audit logging and the i18n framework.
-> See [ROADMAP.md](ROADMAP.md) for the full development plan.
+Works with **Telegram** and **WhatsApp**. More platforms planned.
 
 ---
 
-## Architecture
+## Table of Contents
 
-```
-┌─────────────┐     HTTP/JSON     ┌──────────────────────┐
-│ Telegram Bot │ ───────────────▶ │                      │
-└─────────────┘                   │   Moderation Engine  │
-                                  │      (FastAPI)        │
-┌──────────────┐    HTTP/JSON     │                      │
-│ WhatsApp Bot │ ───────────────▶ │  POST /moderate_text  │
-└──────────────┘                   │  POST /moderate_image│
-                                  │  POST /moderate_video │
-                                  │  GET  /health         │
-                                  └──────────────────────┘
-```
-
-| Directory | Stack | Purpose |
-|-----------|-------|---------|
-| `engine/` | Python 3.11, FastAPI | Content classification API |
-| `telegram-bot/` | Python, python-telegram-bot | Telegram group listener |
-| `whatsapp-bot/` | Node.js, TypeScript, Baileys | WhatsApp group listener |
+- [What It Does](#what-it-does)
+- [Quick Start](#quick-start)
+- [Deepfake Detection Setup](#deepfake-detection-setup)
+- [Architecture](#architecture)
+- [Configuration Reference](#configuration-reference)
+- [API Reference](#api-reference)
+- [GDPR & Privacy](#gdpr--privacy)
+- [Running Tests](#running-tests)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## How It Works
+## What It Does
 
-1. A bot receives a message (text / image / video) in a group chat.
-2. It forwards the content to the engine API.
-3. The engine detects the language, runs the appropriate ML classifier and
-   pattern matcher, and returns a verdict:
-   - `"allow"` — content is safe, no action
-   - `"flag"` — scores are elevated, admins are notified
-   - `"delete"` — content exceeds thresholds, message is deleted (if bot has admin rights) or admins are @-mentioned
-4. The bot acts on the verdict and sends admin notifications in the detected language.
+A bot sits in your group chat. When someone sends a message, image, or video, the bot checks it against ML models and returns one of three verdicts:
 
-### Moderation categories
+| Verdict | What happens |
+|---------|-------------|
+| **allow** | Nothing — content is safe |
+| **flag** | Admins get notified for review |
+| **delete** | Message is removed (or admins are pinged if bot lacks permissions) |
 
-| Category | Model | Status |
-|----------|-------|--------|
-| Violence | BART zero-shot (EN) / German toxic model (DE) | ✅ Working |
-| Sexual violence | BART zero-shot (EN) / German toxic model (DE) | ✅ Working |
-| NSFW | BART zero-shot (EN) / German toxic model (DE) | ✅ Working |
-| Cyberbullying | Language-specific patterns + ML labels | ✅ Working |
-| Deepfake | EfficientNet-B0 ONNX / SightEngine / custom API | ✅ Working (pluggable providers) |
-| Video | OpenCV frame extraction + per-frame analysis | ✅ Working |
+**Categories detected:** violence, sexual violence, NSFW, cyberbullying, deepfakes
 
----
+**Who is this for?**
+- Schools and class chats
+- Youth organisations and sports clubs
+- Companies and teams
+- Any community group that needs moderation
 
-## Language Packs
-
-Deepfake Guardian uses a plugin architecture for language-aware moderation.
-Each language pack lives in `engine/i18n/packs/<lang_code>.py` and is
-auto-discovered at startup.
-
-**Adding a new language** requires only one file:
-
-```python
-# engine/i18n/packs/fr.py
-from i18n.base import HarmPattern, Helpline, LanguagePack
-
-class FrenchPack(LanguagePack):
-    lang_code = "fr"
-    lang_name = "Français"
-
-    def detect(self, text): ...
-    def get_classifier(self): ...
-    def get_labels(self): ...
-    def get_patterns(self): ...
-    def get_educational_messages(self): ...
-    def get_helplines(self): ...
-```
-
-Enable it via `ENABLED_LANGUAGES=en,de,fr` in `engine/.env`.
-
-**Currently bundled:**
-- 🇬🇧 English (`en`) — `facebook/bart-large-mnli` zero-shot + EN patterns
-- 🇩🇪 German (`de`) — `ml6team/distilbert-base-german-cased-toxic-comments` + DE patterns + Telefonseelsorge
+> Use `MODERATION_PROFILE=minors_strict` for groups with children — it lowers all thresholds automatically.
 
 ---
 
 ## Quick Start
 
-### Prerequisites
+### What you need
 
-- Docker & Docker Compose, **or** Python 3.11+, Node.js 18+, and ffmpeg
-- A Telegram bot token from [@BotFather](https://t.me/BotFather)
+- **Docker** (recommended) — or Python 3.11+ and Node.js 18+
+- A **Telegram bot token** from [@BotFather](https://t.me/BotFather)
 
-### System Requirements
-
-| Resource | Minimum | Recommended | Notes |
-|----------|---------|-------------|-------|
-| **RAM** | 4 GB | 8 GB | ML models (PyTorch, BART, CLIP) use ~2–3 GB; deepfake detection adds ~500 MB |
-| **CPU** | 2 cores | 4+ cores | ONNX inference is ~20–50ms/face on modern CPU; video processing benefits from parallelism |
-| **Disk** | 4 GB free | 6 GB free | ML models ~2.5 GB + ONNX model ~20 MB + system dependencies |
-| **GPU** | Not required | Optional | `onnxruntime` uses CPU by default; swap to `onnxruntime-gpu` for NVIDIA acceleration |
-
-Docker handles all system dependencies (ffmpeg, etc.) automatically. For bare-metal:
-```bash
-# Ubuntu/Debian
-sudo apt-get install ffmpeg
-
-# macOS
-brew install ffmpeg
-```
-
-### 1. Clone and configure
+### 3 steps to running
 
 ```bash
+# 1. Clone and copy config files
 git clone https://github.com/alcoolio/deepfake-guardian.git
 cd deepfake-guardian
-
 cp engine/.env.example engine/.env
 cp telegram-bot/.env.example telegram-bot/.env
-cp whatsapp-bot/.env.example whatsapp-bot/.env
-```
 
-Edit `telegram-bot/.env` and set `TELEGRAM_BOT_TOKEN`.
+# 2. Set your Telegram bot token
+#    Open telegram-bot/.env and paste your token:
+#    TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
 
-### 2. Run with Docker Compose
-
-```bash
+# 3. Start everything
 docker compose up --build
 ```
 
-The engine downloads ML models on first run (~1.8 GB including the German model).
-Subsequent starts use a cached Docker volume.
+First run downloads ML models (~1.8 GB). After that, starts in seconds.
 
-### 3. Add the bot to a group
+**That's it.** Add the bot to a Telegram group, give it admin rights, and it starts moderating.
 
-Invite the bot to a Telegram group and grant it **admin rights** so it can delete
-messages. Without admin rights it will @-mention admins instead.
+> Without admin rights the bot will @-mention admins instead of deleting messages.
 
-### 4. Run without Docker
+### Running without Docker
 
 ```bash
 # Terminal 1 — Engine
@@ -151,85 +83,167 @@ cd engine && pip install -r requirements.txt && python main.py
 # Terminal 2 — Telegram bot
 cd telegram-bot && pip install -r requirements.txt && python main.py
 
-# Terminal 3 — WhatsApp bot
+# Terminal 3 — WhatsApp bot (optional)
 cd whatsapp-bot && npm install && npm run build && npm start
+```
+
+Bare-metal also needs `ffmpeg` installed (`apt install ffmpeg` or `brew install ffmpeg`).
+
+---
+
+## Deepfake Detection Setup
+
+Deepfake detection is **off by default** (`stub` mode). To enable it, pick a provider and set your API key in `engine/.env`.
+
+### Option A: OpenAI (easiest)
+
+```env
+DEEPFAKE_PROVIDER=openai
+OPENAI_API_KEY=sk-your-key-here
+```
+
+Get a key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys). Uses GPT-4o vision. Face images are sent to OpenAI — consider GDPR implications for groups with minors.
+
+### Option B: Ollama (free, private)
+
+```env
+DEEPFAKE_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llava
+```
+
+Install [Ollama](https://ollama.com), then `ollama pull llava`. All data stays on your machine.
+
+### Option C: Local ONNX model (advanced)
+
+```env
+DEEPFAKE_PROVIDER=local
+```
+
+Runs an EfficientNet-B0 model on CPU. Needs ~500 MB extra RAM and `onnxruntime`, `mediapipe`, `opencv-python-headless`. Best privacy — nothing leaves the server.
+
+### Option D: SightEngine or custom API
+
+```env
+# SightEngine
+DEEPFAKE_PROVIDER=sightengine
+SIGHTENGINE_API_USER=your-user
+SIGHTENGINE_API_SECRET=your-secret
+
+# Or any HTTP endpoint
+DEEPFAKE_PROVIDER=api
+DEEPFAKE_API_URL=https://your-api.com/detect
+DEEPFAKE_API_KEY=your-key
 ```
 
 ---
 
-## Configuration
+## Architecture
 
-All services use `.env` files. See `.env.example` files for full lists.
+```
+┌─────────────┐                    ┌────────────────────┐
+│ Telegram Bot │──── HTTP/JSON ───▶│                    │
+└─────────────┘                    │  Moderation Engine │
+┌──────────────┐                   │     (FastAPI)      │
+│ WhatsApp Bot │──── HTTP/JSON ───▶│                    │
+└──────────────┘                    └────────────────────┘
+```
 
-### Engine — i18n & language packs
+| Directory | Stack | Role |
+|-----------|-------|------|
+| `engine/` | Python 3.11, FastAPI | ML classification + verdict logic |
+| `telegram-bot/` | Python, python-telegram-bot | Listens to Telegram groups |
+| `whatsapp-bot/` | Node.js, TypeScript, Baileys | Listens to WhatsApp groups |
 
-| Variable | Default | Meaning |
-|----------|---------|---------|
-| `ENABLED_LANGUAGES` | `en,de` | Comma-separated list of active language pack codes |
+The engine is the brain. Bots are thin clients — they forward content, get a verdict, and act on it.
 
-### Engine — moderation profiles
+### How moderation works
 
-| Variable | Default | Meaning |
-|----------|---------|---------|
-| `MODERATION_PROFILE` | `default` | Pre-configured threshold set: `minors_strict` \| `default` \| `permissive` |
+1. Bot receives a message (text / image / video) in a group chat
+2. Forwards content to the engine API
+3. Engine detects language, runs ML classifiers + pattern matchers
+4. Engine returns verdict + scores
+5. Bot deletes, flags, or allows the message
 
-Profiles set all thresholds at once. Individual `THRESHOLD_*` env vars override
-specific values within the chosen profile.
+### Moderation categories
 
-| Profile | Violence | Sexual violence | NSFW | Deepfake | Cyberbullying |
-|---------|----------|-----------------|------|----------|---------------|
-| `minors_strict` | 0.5 | 0.3 | 0.4 | 0.6 | 0.4 |
-| `default` | 0.5 | 0.5 | 0.8 | 0.7 | 0.65 |
-| `permissive` | 0.85 | 0.7 | 0.75 | 0.9 | 0.8 |
+| Category | How it works |
+|----------|-------------|
+| Violence | BART zero-shot (EN) / German toxic model (DE) |
+| Sexual violence | BART zero-shot (EN) / German toxic model (DE) |
+| NSFW | BART zero-shot (EN) / German toxic model (DE) |
+| Cyberbullying | Language-specific patterns + ML labels |
+| Deepfake | OpenAI / Ollama / ONNX / SightEngine / custom API |
+| Video | OpenCV frame extraction + per-frame analysis |
 
-### Engine — individual thresholds (0–1 scale)
+### Language support
+
+Auto-detects language per message. Each language has its own ML model, patterns, and educational messages.
+
+| Language | Pack | Models |
+|----------|------|--------|
+| English | `en` | `facebook/bart-large-mnli` + EN patterns |
+| German | `de` | `ml6team/distilbert-base-german-cased-toxic-comments` + DE patterns |
+
+Add a new language by creating one file in `engine/i18n/packs/`. Enable with `ENABLED_LANGUAGES=en,de,fr`.
+
+---
+
+## Configuration Reference
+
+All config lives in `.env` files. Copy from `.env.example` and edit.
+
+### Moderation profiles
+
+Set all thresholds at once with `MODERATION_PROFILE`:
+
+| Profile | Violence | Sexual V. | NSFW | Deepfake | Cyberbullying | Best for |
+|---------|----------|-----------|------|----------|---------------|----------|
+| `minors_strict` | 0.5 | 0.3 | 0.4 | 0.6 | 0.4 | Schools, youth groups |
+| `default` | 0.5 | 0.5 | 0.8 | 0.7 | 0.65 | General communities |
+| `permissive` | 0.85 | 0.7 | 0.75 | 0.9 | 0.8 | Adult groups |
 
 > **How thresholds work:** each threshold is the minimum confidence score that
 > triggers an automatic deletion. A **lower value means higher priority** — the
-> engine deletes at lower model confidence, so the category is caught earlier and
+> engine deletes at lower model confidence, catching the category earlier and
 > more aggressively. A higher value means the model must be very confident before
-> acting, reducing false positives for noisier categories.
+> acting, reducing false positives.
 
-| Variable | Default | Priority |
-|----------|---------|---------|
-| `THRESHOLD_VIOLENCE` | `0.5` | Highest — deleted at low confidence |
-| `THRESHOLD_SEXUAL_VIOLENCE` | `0.5` | Highest — same as violence |
-| `THRESHOLD_CYBERBULLYING` | `0.65` | High |
-| `THRESHOLD_DEEPFAKE` | `0.7` | Medium |
-| `THRESHOLD_NSFW` | `0.8` | Lower — only deleted at high confidence |
+Individual `THRESHOLD_*` vars override specific values within the profile.
 
-Messages with any score **≥ 0.4** but below the delete threshold are **flagged** for
-admin review instead of being deleted.
+### Engine — all variables
 
-### Engine — deepfake detection
-
-| Variable | Default | Meaning |
-|----------|---------|---------|
-| `DEEPFAKE_PROVIDER` | `local` | Detection provider: `local` \| `sightengine` \| `api` \| `stub` |
-| `DEEPFAKE_MODEL_PATH` | _(auto)_ | Path to ONNX model file (auto-downloaded if empty) |
-| `SIGHTENGINE_API_USER` | _(empty)_ | SightEngine API user (only if provider=sightengine) |
-| `SIGHTENGINE_API_SECRET` | _(empty)_ | SightEngine API secret (only if provider=sightengine) |
-| `DEEPFAKE_API_URL` | _(empty)_ | Custom API endpoint (only if provider=api) |
-| `DEEPFAKE_API_KEY` | _(empty)_ | Bearer token for custom API (only if provider=api) |
-
-**Privacy note:** The `local` provider (default) runs all inference on-device — face
-images never leave the server. Cloud providers (`sightengine`, `api`) send face crops
-to external services. Use `local` for GDPR-sensitive deployments with minors.
-
-### Engine — video processing
-
-| Variable | Default | Meaning |
-|----------|---------|---------|
-| `FRAME_INTERVAL` | `2.0` | Seconds between sampled frames |
-| `MAX_FRAMES` | `10` | Maximum frames to analyse per video |
-| `MAX_VIDEO_DURATION` | `300` | Maximum video duration in seconds (longer videos are rejected) |
-
-### Engine — security
-
-| Variable | Default | Meaning |
-|----------|---------|---------|
-| `API_KEY` | _(empty)_ | Secret key required in `X-API-Key` header; leave empty to disable auth (dev only) |
-| `RATE_LIMIT` | `60/minute` | Max requests per IP per interval on moderation endpoints |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HOST` | `0.0.0.0` | Bind address |
+| `PORT` | `8000` | Listen port |
+| `LOG_LEVEL` | `info` | Logging verbosity |
+| `API_KEY` | _(empty)_ | Auth key for `X-API-Key` header; empty = no auth (dev only) |
+| `RATE_LIMIT` | `60/minute` | Rate limit per IP on moderation endpoints |
+| `ENABLED_LANGUAGES` | `en,de` | Active language packs |
+| `MODERATION_PROFILE` | `default` | Threshold profile (see above) |
+| `THRESHOLD_VIOLENCE` | _from profile_ | Override violence threshold (0–1) |
+| `THRESHOLD_SEXUAL_VIOLENCE` | _from profile_ | Override sexual violence threshold |
+| `THRESHOLD_NSFW` | _from profile_ | Override NSFW threshold |
+| `THRESHOLD_DEEPFAKE` | _from profile_ | Override deepfake threshold |
+| `THRESHOLD_CYBERBULLYING` | _from profile_ | Override cyberbullying threshold |
+| `DEEPFAKE_PROVIDER` | `stub` | `openai` \| `ollama` \| `local` \| `sightengine` \| `api` \| `stub` |
+| `OPENAI_API_KEY` | _(empty)_ | OpenAI key (for `openai` provider) |
+| `OPENAI_MODEL` | `gpt-4o` | OpenAI vision model |
+| `OPENAI_API_BASE` | `https://api.openai.com/v1` | OpenAI-compatible base URL |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server (for `ollama` provider) |
+| `OLLAMA_MODEL` | `llava` | Ollama vision model |
+| `DEEPFAKE_MODEL_PATH` | _(auto)_ | ONNX model path (for `local` provider) |
+| `SIGHTENGINE_API_USER` | _(empty)_ | SightEngine user (for `sightengine` provider) |
+| `SIGHTENGINE_API_SECRET` | _(empty)_ | SightEngine secret |
+| `DEEPFAKE_API_URL` | _(empty)_ | Custom endpoint (for `api` provider) |
+| `DEEPFAKE_API_KEY` | _(empty)_ | Bearer token for custom API |
+| `FRAME_INTERVAL` | `2.0` | Seconds between sampled video frames |
+| `MAX_FRAMES` | `10` | Max frames per video |
+| `MAX_VIDEO_DURATION` | `300` | Max video length in seconds |
+| `DATABASE_URL` | `sqlite+aiosqlite:///./deepfake_guardian.db` | Database URL |
+| `GDPR_SALT` | _(change me)_ | Secret salt for hashing user IDs |
+| `DATA_RETENTION_DAYS` | `30` | Days before auto-deletion of moderation events |
 
 ### Telegram bot
 
@@ -237,31 +251,30 @@ to external services. Use `local` for GDPR-sensitive deployments with minors.
 |----------|----------|-------------|
 | `TELEGRAM_BOT_TOKEN` | Yes | Token from @BotFather |
 | `ENGINE_URL` | No | Engine URL (default: `http://engine:8000`) |
-| `ENGINE_API_KEY` | No | Must match `API_KEY` in `engine/.env` |
-| `BOT_LANGUAGE` | No | Language for admin notifications: `en` or `de` (default: `en`) |
+| `ENGINE_API_KEY` | No | Must match engine's `API_KEY` |
+| `BOT_LANGUAGE` | No | Admin notification language: `en` or `de` |
+
+### WhatsApp bot
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENGINE_URL` | `http://engine:8000` | Engine URL |
 
 ---
 
-## Manual API Test
+## API Reference
 
-```bash
-# Moderate English text
-curl -s -X POST http://localhost:8000/moderate_text \
-  -H "Content-Type: application/json" \
-  -d '{"text": "nobody likes you, you should die"}' | python3 -m json.tool
+### Endpoints
 
-# Moderate German text
-curl -s -X POST http://localhost:8000/moderate_text \
-  -H "Content-Type: application/json" \
-  -d '{"text": "keiner mag dich, du solltest sterben"}' | python3 -m json.tool
-
-# Explicit language hint
-curl -s -X POST http://localhost:8000/moderate_text \
-  -H "Content-Type: application/json" \
-  -d '{"text": "hello world", "language": "en"}' | python3 -m json.tool
+```
+POST /moderate_text    {"text": "...", "language": "en"}
+POST /moderate_image   {"image_base64": "..." | "image_url": "..."}
+POST /moderate_video   {"video_base64": "..." | "video_url": "..."}
+GET  /health
 ```
 
-Expected response shape:
+### Response format
+
 ```json
 {
   "verdict": "allow",
@@ -277,26 +290,60 @@ Expected response shape:
 }
 ```
 
+### Try it
+
+```bash
+curl -s -X POST http://localhost:8000/moderate_text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "hello world"}' | python3 -m json.tool
+```
+
+### GDPR endpoints
+
+```
+POST /gdpr/export              — export all data for a user (Article 15)
+POST /gdpr/delete_request      — submit erasure request (Article 17)
+GET  /gdpr/delete_request/{id} — check erasure status
+```
+
+### Warning system
+
+```
+POST /warnings/record          — record a violation, returns escalation action
+GET  /warnings/{user_id_hash}  — fetch warning history
+```
+
+Escalation: 1st = educational notice, 2nd = admin notification, 3rd+ = supervisor escalation.
+
+---
+
+## GDPR & Privacy
+
+| Data | Stored? | Details |
+|------|---------|---------|
+| Message text / images / video | **Never** | Processed in memory, not persisted |
+| Moderation verdicts + scores | Yes (metadata) | Auto-deleted after `DATA_RETENTION_DAYS` |
+| User/group IDs | Yes (hashed) | SHA-256 with secret salt — not reversible |
+| Warning counts | Yes | Deleted on erasure request |
+
+**Telegram bot commands:**
+- `/privacy` — shows privacy notice in the group
+- `/delete_my_data` — submits an Article 17 erasure request
+
+**Privacy notes:**
+- Content is **never stored** — only an 80-char preview in debug logs (never in DB)
+- User IDs are hashed before storage
+- `DEEPFAKE_PROVIDER=ollama` or `local` keeps all data on your server
+- `DEEPFAKE_PROVIDER=openai`, `sightengine`, or `api` sends face crops externally
+
 ---
 
 ## Running Tests
 
 ```bash
-# Engine
 cd engine && pip install -r requirements.txt && pytest
-
-# Telegram bot
 cd telegram-bot && pip install -r requirements.txt && pytest
 ```
-
----
-
-## Known Limitations
-
-- **Local deepfake model requires download** — the ONNX model (~20 MB) is downloaded
-  on first use. Set `DEEPFAKE_PROVIDER=stub` for CI/testing without models.
-- **No admin dashboard yet** — planned for Phase 5.
-- **WhatsApp bot** has fewer features than the Telegram bot (no GDPR commands yet).
 
 ---
 
@@ -304,102 +351,27 @@ cd telegram-bot && pip install -r requirements.txt && pytest
 
 | Phase | Focus | Status |
 |-------|-------|--------|
-| 1 | Tests, CI/CD, API auth, resilience | ✅ Done |
-| 2 | i18n architecture, German + English language packs, cyberbullying | ✅ Done |
-| 3 | GDPR compliance, database, warning/escalation system | ✅ Done |
-| 4 | Real deepfake detection, video frame extraction | ✅ Done |
-| 5 | Admin dashboard, admin bot commands, educational feedback | Planned |
-| 6 | WhatsApp parity, Signal & Discord bots, community language packs | Planned |
+| 1 | Tests, CI/CD, API auth, resilience | Done |
+| 2 | i18n, language packs, cyberbullying | Done |
+| 3 | GDPR compliance, warnings, escalation | Done |
+| 4 | Deepfake detection, video analysis | Done |
+| 5 | Admin dashboard, bot commands | Planned |
+| 6 | WhatsApp parity, Signal, Discord | Planned |
 
-See [ROADMAP.md](ROADMAP.md) for the full plan including file-level details.
-
----
-
-## Target Audiences
-
-Deepfake Guardian is designed for organisations that run group chats with members
-who need higher protection:
-
-- **Schools and educational institutions** — student groups, class chats
-- **Youth organisations** — scouts, sports clubs, youth centres
-- **Companies and teams** — internal communication channels
-- **Community groups** — hobby communities, local associations
-
-Use `MODERATION_PROFILE=minors_strict` for groups with minors.
-
----
-
-## GDPR & Privacy
-
-### What is stored
-
-| Data | Stored? | Notes |
-|------|---------|-------|
-| Message text / images / video | **Never** | Processed in memory only |
-| Moderation verdict + scores | ✅ (metadata only) | Deleted after `DATA_RETENTION_DAYS` (default 30) |
-| User/group identifiers | ✅ (hashed) | SHA-256 with secret salt — not reversible |
-| Warning counts | ✅ | Deleted on erasure request |
-
-### Engine — GDPR configuration
-
-| Variable | Default | Meaning |
-|----------|---------|---------|
-| `DATABASE_URL` | `sqlite+aiosqlite:///./deepfake_guardian.db` | SQLite (default) or PostgreSQL asyncpg URL |
-| `GDPR_SALT` | *(change me)* | Secret salt for SHA-256 hashing — **set a strong random value in production** |
-| `DATA_RETENTION_DAYS` | `30` | Days before moderation events are auto-deleted |
-
-### User rights (GDPR Articles 15–17)
-
-| Command | Behaviour |
-|---------|-----------|
-| `/privacy` | Shows the full privacy notice in the group |
-| `/delete_my_data` | Submits an Article 17 erasure request; all stored data is deleted within 30 days |
-
-Engine API endpoints for programmatic access:
-
-```
-POST /gdpr/export                  — Article 15: export all data for a user
-POST /gdpr/delete_request          — Article 17: submit erasure request
-GET  /gdpr/delete_request/{id}     — check erasure request status
-```
-
-### Warning / escalation system
-
-```
-POST /warnings/record              — record a violation, returns escalation action
-GET  /warnings/{user_id_hash}      — fetch warning history for a user
-```
-
-Escalation levels per (user, group):
-
-| Violation count | Action |
-|----------------|--------|
-| 1st | `notice` — educational reply in the group |
-| 2nd | `admin_notification` — @-mention group admins |
-| 3rd+ | `supervisor_escalation` — urgent admin mention with incident count |
-
-### Security & Privacy notes
-
-- Message content is **never stored** — only a 80-char preview appears in
-  structured debug logs (never in the database).
-- User IDs are hashed with SHA-256 + secret salt before storage.
-- GDPR compliance for minors is the strictest standard globally and covers
-  COPPA (USA), PIPEDA (Canada), LGPD (Brazil), and similar frameworks.
-- See `engine/privacy_policy.md` for a deployable privacy policy template.
+See [ROADMAP.md](ROADMAP.md) for full details.
 
 ---
 
 ## Contributing
 
-Contributions are welcome. Please open an issue before starting large changes.
+Contributions welcome. Open an issue before starting large changes.
 
-Areas where help is especially needed:
-- Language packs (French, Spanish, Turkish, Arabic are next priorities)
-- A real deepfake detection model integration
-- Tests
-- Documentation translations
+**Help needed with:**
+- Language packs (French, Spanish, Turkish, Arabic)
+- Tests and documentation
+- WhatsApp bot features
 
-See [CLAUDE.md](CLAUDE.md) for a detailed technical orientation to the codebase.
+See [CLAUDE.md](CLAUDE.md) for a detailed technical guide to the codebase.
 
 ---
 
