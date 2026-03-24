@@ -48,6 +48,7 @@ The central brain. All bots call this API to get moderation decisions.
 | `routes.py` | Three POST endpoints: `/moderate_text`, `/moderate_image`, `/moderate_video` |
 | `classifiers.py` | ML classifiers: text (BART zero-shot), image (CLIP zero-shot + violence), deepfake (provider-based) |
 | `verdict.py` | `decide(scores)` → `"allow"` / `"flag"` / `"delete"` based on thresholds |
+| `profiles.py` | Named threshold profiles (`minors_strict`, `default`, `permissive`) — **single source of truth for default thresholds** |
 | `models.py` | Pydantic request/response schemas (`ModerationResult`, `ModerationScores`) |
 | `config.py` | `Settings` class — all config from env vars with sane defaults |
 | `requirements.txt` | Python dependencies |
@@ -80,14 +81,20 @@ GET  /health          (health check)
 - Any score ≥ 0.4 but below threshold → `"flag"`
 - Otherwise → `"allow"`
 
-**Default thresholds** (all overridable via env):
-```
-THRESHOLD_VIOLENCE        = 0.5
-THRESHOLD_SEXUAL_VIOLENCE = 0.5
-THRESHOLD_NSFW            = 0.8
-THRESHOLD_DEEPFAKE        = 0.7
-THRESHOLD_CYBERBULLYING   = 0.65
-```
+**Threshold profiles** (`engine/profiles.py` — single source of truth):
+
+| Profile | violence | sexual_violence | nsfw | deepfake | cyberbullying |
+|---------|----------|-----------------|------|----------|---------------|
+| `minors_strict` | 0.5 | 0.3 | 0.4 | 0.6 | 0.4 |
+| `default` *(active)* | 0.5 | 0.5 | 0.8 | 0.7 | 0.65 |
+| `permissive` | 0.85 | 0.7 | 0.75 | 0.9 | 0.8 |
+
+Select a profile via `MODERATION_PROFILE=default` (env var). Individual
+`THRESHOLD_*` env vars override a single value within the chosen profile.
+
+> **Contributor rule:** whenever you change a threshold value in `profiles.py`,
+> update the matching hardcoded values in `engine/tests/test_verdict.py` in the
+> same commit. Mismatches cause CI failures.
 
 ### `telegram-bot/`
 
@@ -193,11 +200,12 @@ curl -X POST http://localhost:8000/moderate_text \
 | `HOST` | `0.0.0.0` | Bind address |
 | `PORT` | `8000` | Listen port |
 | `LOG_LEVEL` | `info` | Logging verbosity |
-| `THRESHOLD_VIOLENCE` | `0.5` | Delete threshold for violence (0–1) |
-| `THRESHOLD_SEXUAL_VIOLENCE` | `0.5` | Delete threshold for sexual violence |
-| `THRESHOLD_NSFW` | `0.8` | Delete threshold for NSFW |
-| `THRESHOLD_DEEPFAKE` | `0.7` | Delete threshold for deepfake |
-| `THRESHOLD_CYBERBULLYING` | `0.65` | Delete threshold for cyberbullying |
+| `MODERATION_PROFILE` | `default` | Threshold profile (`minors_strict` / `default` / `permissive`) |
+| `THRESHOLD_VIOLENCE` | `0.5` | Override delete threshold for violence (0–1) |
+| `THRESHOLD_SEXUAL_VIOLENCE` | `0.5` | Override delete threshold for sexual violence |
+| `THRESHOLD_NSFW` | `0.8` | Override delete threshold for NSFW |
+| `THRESHOLD_DEEPFAKE` | `0.7` | Override delete threshold for deepfake |
+| `THRESHOLD_CYBERBULLYING` | `0.65` | Override delete threshold for cyberbullying |
 
 ### Telegram bot (`telegram-bot/.env`)
 
@@ -226,7 +234,7 @@ curl -X POST http://localhost:8000/moderate_text \
 ## Key Architectural Decisions
 
 1. **Engine is the single source of truth** for moderation logic. Bots are thin clients — they only forward content and act on verdicts.
-2. **Threshold-based verdicts** are intentionally simple now. Phase 2 introduces profile-based thresholds (`minors_strict`, `default`, `permissive`).
+2. **Profile-based thresholds** (`engine/profiles.py`): three named profiles (`minors_strict`, `default`, `permissive`) ship with the engine. The active profile is set via `MODERATION_PROFILE`; individual `THRESHOLD_*` env vars override a single value within the chosen profile. Tests in `test_verdict.py` hard-code the `default` profile values — keep them in sync.
 3. **i18n-first architecture** (Phase 2): language detection → language pack → language-specific ML model + patterns + support resources. Adding a new language = one new Python file.
 4. **GDPR-first** (Phase 3): user IDs are hashed before storage; message content is never persisted; auto-deletion after 30 days; full Article 17 (right to erasure) support.
 5. **Telegram has higher priority** than WhatsApp — it uses the official Bot API and is simpler to develop against.
