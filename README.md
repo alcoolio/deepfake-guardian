@@ -65,7 +65,7 @@ the bot checks it using **ML models** and returns one of three verdicts:
 
 ```bash
 # 1. Clone and copy config files
-git clone https://github.com/alcoolio/deepfake-guardian.git
+git clone https://github.com/richardkfm/deepfake-guardian.git
 cd deepfake-guardian
 cp engine/.env.example engine/.env
 cp telegram-bot/.env.example telegram-bot/.env
